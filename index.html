@@ -1,0 +1,2981 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <title>Pokročilý váhový tracker více admirála Jiříka</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    
+<script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-messaging.js"></script>     
+<script src="firebaseFunctions.js"></script>
+  <style>
+body {
+  background: #0d1117;
+  color: #f0f0f0;
+  font-family: Consolas, monospace;
+  padding: 20px;
+  margin: 0;
+  text-align: center;    
+}
+
+.container {
+  max-width: 1350px; /* Trochu širší kontejner pro více sloupců */
+  margin: 0 auto;
+}
+
+h1, h2 {
+  color: #00d9ff;
+  text-align: center;
+}
+
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin: 20px 0;
+}
+
+.card {
+  background: #1f2633;
+  border: 1px solid #444;
+  border-radius: 10px;
+  padding: 20px;
+  transition: transform 0.3s;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  border-color: #00d9ff;
+}
+
+.card h3 {
+  color: #00ff99;
+  margin-top: 0;
+}
+
+.form-group {
+  margin: 15px 0;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  color: #00d9ff;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 10px;
+  background: #0d1117;
+  border: 1px solid #444;
+  color: #f0f0f0;
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #00d9ff;
+  outline: none;
+}
+
+button {
+  background: #00d9ff;
+  color: #000;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  margin: 5px;
+  transition: background 0.3s;
+}
+
+button:hover {
+  background: #00b8cc;
+}
+
+button.danger {
+  background: #ff5555;
+  color: #fff;
+}
+
+button.success {
+  background: #55ff99;
+  color: #000;
+}
+
+button.fullscreen {
+  background: #00d9ff;
+  color: #000;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  font-size: 1.2rem;
+}
+
+button.fullscreen:hover {
+  background: #00b8cc;
+  transform: scale(1.1);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background: #1f2633;
+  font-size: 0.9em; /* Menší písmo pro více sloupců */
+}
+
+th, td {
+  border: 1px solid #444;
+  padding: 8px; /* Menší padding */
+  text-align: center;
+}
+
+th {
+  background: #0d1117;
+  color: #00d9ff;
+}
+
+.gain {
+  color: #ff5555;
+}
+
+.loss {
+  color: #55ff99;
+}
+
+.bmi-normal { color: #55ff99; }
+.bmi-underweight { color: #00d9ff; }
+.bmi-overweight { color: #ffff55; }
+.bmi-obese { color: #ff5555; }
+
+.alert {
+  padding: 15px;
+  margin: 15px 0;
+  border-radius: 5px;
+  background: #ff5555;
+  color: #fff;
+  display: none;
+}
+
+.alert.show {
+  display: block;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); /* Ještě menší minmax pro více položek */
+  gap: 10px; /* Menší mezery */
+  margin: 20px 0;
+}
+
+.stat-item {
+  background: #1f2633;
+  padding: 10px; /* Menší padding */
+  border-radius: 10px;
+  text-align: center;
+  border: 1px solid #444;
+}
+
+.stat-value {
+  font-size: 1.5em; /* Menší písmo */
+  font-weight: bold;
+  color: #00d9ff;
+}
+.stat-label {
+    font-size: 0.8em; /* Menší písmo */
+    color: #ccc;
+    margin-top: 3px;
+}
+
+
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #00d9ff;
+  color: #000;
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  display: none;
+  z-index: 1000;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 20px;
+  background: #444;
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 10px 0;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00d9ff, #00ff99);
+  transition: width 0.3s;
+}
+
+.tabs {
+  display: flex;
+  margin: 20px 0;
+  border-bottom: 1px solid #444;
+}
+
+.tab {
+  padding: 10px 20px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: #ccc;
+}
+
+.tab.active {
+  color: #00d9ff;
+  border-bottom-color: #00d9ff;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+  /* Obecné nastavení kontejneru pro grafy */
+.charts-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  padding: 25px;
+  background-color: #2c3e50;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Styl jednotlivých karet s grafem */
+.chart-card {
+  background-color: white;
+  border-radius: 0px;
+  padding: 40px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  flex: 1 1 305px;
+  max-width: 50px;
+  min-width: 280px;
+  transition: transform 0.3s ease;
+   overflow-x: auto; /* přidá scroll pokud se to nevejde */  
+}
+
+.chart-card:hover {
+  transform: scale(1.02);
+}
+
+/* Nadpis grafu */
+.chart-card h3 {
+  margin-bottom: 15px;
+  font-size: 20px;
+  color: #2c3e50;
+  text-align: center;
+}
+
+/* Canvas grafu */
+.chart-card canvas {
+  width: 100% !important;
+  height: auto !important;
+}
+
+      
+@media (max-width: 768px) { /* Úprava breakpointu pro lepší zobrazení tabulky */
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+   table {
+    font-size: 0.75rem; /* Ještě menší písmo pro mobily */
+  }
+  th, td {
+    padding: 4px;
+  }
+}
+
+
+@media (max-width: 480px) {
+  body {
+    padding: 10px;
+  }
+  h1, h2 {
+    font-size: 1.5rem;
+  }
+  .dashboard {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  .card {
+    padding: 15px;
+  }
+  .charts-container {
+    grid-template-columns: 1fr;
+  }
+  .chart-card {
+    padding: 15px;
+    overflow-x: auto;
+  }
+  .stats {
+    grid-template-columns: 1fr 1fr; 
+  }
+  .stat-item {
+    padding: 5px;
+  }
+  .stat-value {
+    font-size: 1.2em;
+  }
+   .stat-label {
+    font-size: 0.7em;
+  }
+  .notification {
+    width: 80%;
+    left: 10%;
+    right: 10%;
+  }
+  .tabs {
+    flex-direction: column;
+    border-bottom: none;
+  }
+  .tab {
+    border-bottom: 1px solid #444;
+    padding: 8px 15px;
+  }
+  .tab.active {
+    border-left: 3px solid #00d9ff;
+    border-bottom: 1px solid #444;
+  }
+  button {
+    min-height: 5px; /* Doporučená minimální výška pro dotyk */
+        padding: 0px 0px; /* Větší padding pro snadnější dotyk */
+        display: inline-flex; /* Zajistí, že text je vycentrovaný vertikálně */
+        align-items: center;
+        justify-content: center;
+  }
+  button.fullscreen {
+    width: 40px !important;
+    height: 40px !important;
+    bottom: 10px !important;
+    right: 10px !important;
+  }
+  table {
+    font-size: 0.65rem; /* Extrémně malé písmo - zvážit skrytí sloupců */
+    display: block; /* Umožní horizontální scroll pro tabulku */
+    overflow-x: auto; /* Přidá horizontální scroll pro tabulku */
+  }
+  th, td {
+    padding: 3px;
+     white-space: nowrap; /* Zabrání zalomení textu v buňkách */
+  }
+}
+
+.charts-container {
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+  gap: 20px; 
+  padding: 20px; 
+  background-color: #1a222d; 
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  margin-top: 20px; 
+}
+
+.chart-card {
+  background-color: #1f2633; 
+  border-radius: 10px; 
+  padding: 20px; 
+  box-shadow: none; 
+  border: 1px solid #444; 
+  transition: transform 0.3s ease, border-color 0.3s ease; 
+  overflow-x: auto;
+}
+.chart-card:hover {
+  transform: translateY(-5px); 
+  border-color: #00d9ff; 
+}
+
+.chart-card h3 {
+  margin-bottom: 15px;
+  font-size: 1.2rem; 
+  color: #00ff99; 
+  text-align: center;
+}
+
+.chart-card canvas {
+  width: 100% !important;
+  height: auto !important;
+  max-height: 200px; 
+}
+
+/* ===== MOBILNÍ RESPONZIVITA - KOMPLETNÍ @MEDIA QUERIES ===== */
+
+/* Tablety a menší desktopy */
+@media (max-width: 1024px) {
+  .container {
+    max-width: 95%;
+    padding: 0 10px;
+  }
+  
+  .dashboard {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 15px;
+  }
+  
+  .charts-container {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 15px;
+    padding: 15px;
+  }
+  
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
+/* Větší mobily a malé tablety */
+@media (max-width: 768px) {
+  body {
+    padding: 15px 10px;
+    font-size: 14px;
+  }
+  
+  .container {
+    max-width: 100%;
+    padding: 0 5px;
+  }
+  
+  h1 {
+    font-size: 1.8rem;
+    margin: 15px 0;
+  }
+  
+  h2 {
+    font-size: 1.4rem;
+    margin: 12px 0;
+  }
+  
+  .dashboard {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin: 15px 0;
+  }
+  
+  .card {
+    padding: 15px;
+    margin: 0 5px;
+  }
+  
+  .card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+  }
+  
+  /* Formulářové prvky */
+  input, select, textarea {
+    padding: 12px 8px;
+    font-size: 16px; /* Zabrání zoomování na iOS */
+    border-radius: 8px;
+  }
+  
+  button {
+    min-height: 5px; /* Doporučená minimální výška pro dotyk */
+        padding: 0px 0px; /* Větší padding pro snadnější dotyk */
+        display: inline-flex; /* Zajistí, že text je vycentrovaný vertikálně */
+        align-items: center;
+        justify-content: center;
+  }
+  
+  /* Tabulky */
+  table {
+    font-size: 0.8rem;
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    border-radius: 8px;
+  }
+  
+  th, td {
+    padding: 6px 4px;
+    min-width: 60px;
+  }
+  
+  /* Statistiky */
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+  }
+  
+  .stat-item {
+    padding: 12px 8px;
+  }
+  
+  .stat-value {
+    font-size: 1.3em;
+  }
+  
+  .stat-label {
+    font-size: 0.75em;
+  }
+  
+  /* Grafy */
+  .charts-container {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 12px;
+    margin: 15px 0;
+  }
+  
+  .chart-card {
+    padding: 15px;
+    margin: 0;
+    min-width: unset;
+    max-width: 100%;
+  }
+  
+  .chart-card h3 {
+    font-size: 1rem;
+    margin-bottom: 10px;
+  }
+  
+  .chart-card canvas {
+    max-height: 250px;
+  }
+  
+  /* Taby */
+  .tabs {
+    flex-wrap: wrap;
+    gap: 2px;
+    margin: 2px 0;
+  }
+  
+  .tab {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    flex: 1;
+    text-align: center;
+    min-width: 80px;
+  }
+  
+  /* Progress bar */
+  .progress-bar {
+    height: 25px;
+    margin: 15px 0;
+  }
+  
+  /* Notifikace */
+  .notification {
+    width: 85%;
+    left: 7.5%;
+    right: 7.5%;
+    top: 15px;
+    padding: 12px;
+    font-size: 0.9rem;
+  }
+  
+  /* Fullscreen tlačítko */
+  button.fullscreen {
+    width: 45px;
+    height: 45px;
+    bottom: 15px;
+    right: 15px;
+    font-size: 1.1rem;
+  }
+}
+
+/* Standardní mobily */
+@media (max-width: 480px) {
+  body {
+    padding: 10px 5px;
+    font-size: 13px;
+  }
+  
+  .container {
+    padding: 0;
+  }
+  
+  h1 {
+    font-size: 1.5rem;
+    margin: 10px 0;
+    line-height: 1.3;
+  }
+  
+  h2 {
+    font-size: 1.2rem;
+    margin: 8px 0;
+    line-height: 1.3;
+  }
+  
+  .dashboard {
+    gap: 10px;
+    margin: 10px 0;
+  }
+  
+  .card {
+    padding: 12px;
+    margin: 0 2px;
+    border-radius: 8px;
+  }
+  
+  .card h3 {
+    font-size: 1rem;
+    margin-bottom: 8px;
+  }
+  
+  /* Formuláře */
+  .form-group {
+    margin: 12px 0;
+  }
+  
+  label {
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+  }
+  
+  input, select, textarea {
+    padding: 10px 6px;
+    font-size: 16px;
+    border-radius: 6px;
+  }
+  
+  button {
+    min-height: 5px; /* Doporučená minimální výška pro dotyk */
+        padding: 0px 0px; /* Větší padding pro snadnější dotyk */
+        display: inline-flex; /* Zajistí, že text je vycentrovaný vertikálně */
+        align-items: center;
+        justify-content: center;
+  }
+  
+  /* Tabulky - extrémní optimalizace */
+  table {
+    font-size: 0.65rem;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 6px;
+  }
+  
+  th, td {
+    padding: 5px 5px;
+    white-space: nowrap;
+    min-width: 50px;
+    text-align: center;
+  }
+  
+  th {
+    position: sticky;
+    top: 0;
+    background: green;
+    z-index: 10;
+  }
+  
+  /* Statistiky - dvousloupkový layout */
+  .stats {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin: 12px 0;
+  }
+  
+  .stat-item {
+    padding: 8px 6px;
+    border-radius: 6px;
+  }
+  
+  .stat-value {
+    font-size: 1.1em;
+    line-height: 1.2;
+  }
+  
+  .stat-label {
+    font-size: 0.65em;
+    margin-top: 2px;
+    line-height: 1.1;
+  }
+  
+  /* Grafy - plná šířka */
+  .charts-container {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 8px;
+    margin: 12px 0;
+    border-radius: 8px;
+  }
+  
+  .chart-card {
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .chart-card h3 {
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+  }
+  
+  .chart-card canvas {
+    max-height: 200px;
+    min-height: 150px;
+  }
+  
+  /* Taby - vertikální layout */
+  .tabs {
+    flex-direction: row;
+    border-bottom: none;
+    gap: 0;
+    margin: 2px 0;
+  }
+  
+  .tab {
+    border-bottom: 1px solid #444;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 0.9rem;
+  }
+  
+  .tab.active {
+    border-left: 3px solid #00d9ff;
+    border-bottom: 1px solid #444;
+    background: rgba(0, 217, 255, 0.1);
+  }
+  
+  .tab-content {
+    padding: 10px 0;
+  }
+  
+  /* Progress bar */
+  .progress-bar {
+    height: 20px;
+    margin: 12px 0;
+    border-radius: 10px;
+  }
+  
+  /* Alert */
+  .alert {
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 0.9rem;
+    border-radius: 6px;
+  }
+  
+  /* Notifikace */
+  .notification {
+    width: 90%;
+    left: 5%;
+    right: 5%;
+    top: 10px;
+    padding: 10px;
+    font-size: 0.85rem;
+    border-radius: 8px;
+  }
+  
+  /* Fullscreen tlačítko */
+  button.fullscreen {
+    width: 40px !important;
+    height: 40px !important;
+    bottom: 10px !important;
+    right: 10px !important;
+    font-size: 1rem;
+  }
+}
+
+/* Velmi malé mobily */
+@media (max-width: 360px) {
+  body {
+    padding: 8px 3px;
+    font-size: 12px;
+  }
+  
+  h1 {
+    font-size: 1.3rem;
+  }
+  
+  h2 {
+    font-size: 1.1rem;
+  }
+  
+  .card {
+    padding: 10px;
+    margin: 0 1px;
+  }
+  
+  .card h3 {
+    font-size: 0.95rem;
+  }
+  
+  input, select, textarea {
+    padding: 8px 5px;
+    font-size: 16px;
+  }
+  
+  button {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+  
+  table {
+    font-size: 0.6rem;
+  }
+  
+  th, td {
+    padding: 2px 1px;
+    min-width: 10px;
+  }
+  
+  .stats {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+  }
+  
+  .stat-item {
+    padding: 5px 5px;
+  }
+  
+  .stat-value {
+    font-size: 1rem;
+  }
+  
+  .stat-label {
+    font-size: 0.6em;
+  }
+  
+  .charts-container {
+    padding: 4px;
+    gap: 4px;
+  }
+  
+  .chart-card {
+    padding: 10px;
+  }
+  
+  .chart-card h3 {
+    font-size: 0.85rem;
+  }
+  
+  .chart-card canvas {
+    max-height: 180px;
+  }
+  
+  .tab {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+  
+  button.fullscreen {
+    width: 35px !important;
+    height: 35px !important;
+    font-size: 0.9rem;
+  }
+}
+
+/* Landscape orientace na mobilech */
+@media (max-width: 768px) and (orientation: landscape) {
+  .dashboard {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+  
+  .charts-container {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+  
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  }
+  
+  .chart-card canvas {
+    max-height: 180px;
+  }
+  
+  /* Optimalizace pro landscape - více horizontálního prostoru */
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+  
+  .card {
+    padding: 10px 15px;
+  }
+  
+  h1, h2 {
+    margin: 8px 0;
+  }
+}
+
+/* Portrait orientace na mobilech */
+@media (max-width: 768px) and (orientation: portrait) {
+  body {
+    padding: 15px 8px;
+  }
+  
+  .container {
+    max-width: 100%;
+    padding: 0 3px;
+  }
+  
+  /* Vertikální layout pro portrait */
+  .dashboard {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .charts-container {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px;
+  }
+  
+  .chart-card {
+    padding: 15px 10px;
+  }
+  
+  .chart-card canvas {
+    max-height: 220px;
+    min-height: 160px;
+  }
+  
+  /* Statistiky v portrait - 3 sloupce */
+  .stats {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+  
+  .stat-item {
+    padding: 5px 5px;
+    text-align: center;
+  }
+  
+  .stat-value {
+    font-size: 1.2em;
+    display: block;
+  }
+  
+  .stat-label {
+    font-size: 0.7em;
+    margin-top: 3px;
+  }
+  
+  /* Tabulky v portrait - více vertikálního prostoru */
+  table {
+    max-height: 300px;
+    overflow-y: auto;
+    display: block;
+  }
+  
+  /* Formuláře optimalizované pro portrait */
+  .form-group {
+    margin: 10px 0;
+  }
+  
+  input, select, textarea {
+    width: 100%;
+    padding: 12px 8px;
+  }
+  
+  button {
+    min-height: 5px; /* Doporučená minimální výška pro dotyk */
+        padding: 0px 0px; /* Větší padding pro snadnější dotyk */
+        display: inline-flex; /* Zajistí, že text je vycentrovaný vertikálně */
+        align-items: center;
+        justify-content: center;
+  }
+  
+  /* Taby ve vertikálním layoutu */
+  .tabs {
+    flex-direction: row;
+    margin: 2px 0;
+  }
+  
+  .tab {
+    width: 100%;
+    text-align: left;
+    padding: 12px 15px;
+    border-bottom: 1px solid #444;
+  }
+  
+  .tab.active {
+    border-left: 4px solid #00d9ff;
+    background: rgba(0, 217, 255, 0.1);
+  }
+}
+
+/* Malé mobily v portrait orientaci */
+@media (max-width: 480px) and (orientation: portrait) {
+  body {
+    padding: 10px 5px;
+  }
+  
+  h1 {
+    font-size: 1.4rem;
+    text-align: center;
+    margin: 8px 0;
+  }
+  
+  h2 {
+    font-size: 1.1rem;
+    text-align: center;
+    margin: 6px 0;
+  }
+  
+  .card {
+    padding: 10px;
+    margin: 0 2px 8px 2px;
+  }
+  
+  .charts-container {
+    padding: 8px 5px;
+    gap: 8px;
+  }
+  
+  .chart-card {
+    padding: 12px 8px;
+  }
+  
+  .chart-card canvas {
+    max-height: 200px;
+    min-height: 140px;
+  }
+  
+  /* Extra kompaktní statistiky */
+  .stats {
+    grid-template-columns: 2fr 2fr 2fr;
+    gap: 5px;
+  }
+  
+  .stat-item {
+    padding: 2px 2px;
+  }
+  
+  .stat-value {
+    font-size: 1.1em;
+  }
+  
+  .stat-label {
+    font-size: 0.65em;
+  }
+  
+  /* Tabulky s extra scroll možnostmi */
+  table {
+    font-size: 0.6rem;
+    max-height: 2500px;
+    overflow: auto;
+  }
+  
+  th, td {
+    padding: 2px 2px;
+    min-width: 5px;
+  }
+}
+
+/* Velmi malé mobily v portrait */
+@media (max-width: 360px) and (orientation: portrait) {
+  body {
+    padding: 8px 3px;
+  }
+  
+  .container {
+    padding: 0 1px;
+  }
+  
+  .card {
+    padding: 8px;
+    margin: 0 1px 6px 1px;
+  }
+  
+  .charts-container {
+    padding: 6px 3px;
+    gap: 6px;
+  }
+  
+  .chart-card {
+    padding: 10px 6px;
+  }
+  
+  .chart-card h3 {
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+  }
+  
+  .chart-card canvas {
+    max-height: 170px;
+    min-height: 120px;
+  }
+  
+  .stats {
+    gap: 3px;
+  }
+  
+  .stat-item {
+    padding: 6px 4px;
+  }
+  
+  .stat-value {
+    font-size: 1rem;
+  }
+  
+  .stat-label {
+    font-size: 0.6em;
+  }
+  
+  table {
+    font-size: 0.6rem;
+    max-height: 2500px;
+    overflow: auto;
+  }
+  
+  th, td {
+    padding: 2px 1px;
+    min-width: 2px;
+  }
+  
+  button {
+    min-height: 5px; /* Doporučená minimální výška pro dotyk */
+        padding: 0px 0px; /* Větší padding pro snadnější dotyk */
+        display: inline-flex; /* Zajistí, že text je vycentrovaný vertikálně */
+        align-items: center;
+        justify-content: center;
+  }
+  
+  input, select, textarea {
+    padding: 2px 2px;
+  }
+}
+
+/* Touch-friendly úpravy */
+@media (pointer: coarse) {
+  button {
+    min-height: 5px; /* Doporučená minimální výška pro dotyk */
+        padding: 0px 0px; /* Větší padding pro snadnější dotyk */
+        display: inline-flex; /* Zajistí, že text je vycentrovaný vertikálně */
+        align-items: center;
+        justify-content: center;
+  }
+  
+  input, select, textarea {
+    min-height: 44px;
+    padding: 12px;
+  }
+  
+  .tab {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  
+  table th, table td {
+    min-height: 5x;
+    padding: 2px 2px;
+  }
+}
+table td button { /* Tato pravidla přepíší ty výše definované pro 768px a méně */
+        min-height: 5px; /* Doporučená minimální výška pro dotyk */
+        padding: 0px 0px; /* Větší padding pro snadnější dotyk */
+        display: inline-flex; /* Zajistí, že text je vycentrovaný vertikálně */
+        align-items: center;
+        justify-content: center;
+    }
+}
+      /* ===== SPECIFICKÉ ÚPRAVY PRO BUTTON.DANGER A BUTTON.SUCCESS V @MEDIA ===== */
+
+/* Tablety a menší desktopy */
+@media (max-width: 1024px) {
+    button.danger,
+    button.success, button {
+        min-height: 5px; /* Doporučená minimální výška pro dotyk */
+        padding: 0px 0px; /* Větší padding pro snadnější dotyk */
+        display: inline-flex; /* Zajistí, že text je vycentrovaný vertikálně */
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+/* Větší mobily a malé tablety */
+@media (max-width: 768px) {
+    button.danger,
+    button.success, button {
+        min-height: 5px; /* Doporučená minimální výška pro dotyk */
+        padding: 0px 0px; /* Větší padding pro snadnější dotyk */
+        display: inline-flex; /* Zajistí, že text je vycentrovaný vertikálně */
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+/* Standardní mobily */
+@media (max-width: 480px) {
+    button.danger,
+    button.success, button {
+        min-height: 5px; /* Doporučená minimální výška pro dotyk */
+        padding: 0px 0px; /* Větší padding pro snadnější dotyk */
+        display: inline-flex; /* Zajistí, že text je vycentrovaný vertikálně */
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+/* Velmi malé mobily */
+@media (max-width: 360px) {
+    button.danger,
+    button.success, button {
+        min-height: 5px; /* Doporučená minimální výška pro dotyk */
+        padding: 0px 0px; /* Větší padding pro snadnější dotyk */
+        display: inline-flex; /* Zajistí, že text je vycentrovaný vertikálně */
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+/* Touch-friendly úpravy (platí pro zařízení s dotykovým ovládáním) */
+/* Tato pravidla zajistí, že tlačítka mají dostatečnou dotykovou plochu */
+@media (pointer: coarse) {
+    button.danger,
+    button.success, button {
+        min-height: 5px; /* Doporučená minimální výška pro dotyk */
+        padding: 0px 0px; /* Větší padding pro snadnější dotyk */
+        display: inline-flex; /* Zajistí, že text je vycentrovaný vertikálně */
+        align-items: center;
+        justify-content: center;
+    }
+}
+/* ===== FULLSCREEN REŽIM OPTIMALIZACE ===== */
+
+/* Fullscreen detekce pro všechny browsery */
+:fullscreen table,
+:-webkit-full-screen table,
+:-moz-full-screen table,
+:-ms-fullscreen table {
+  width: 100%;
+  height: 900vh; /* 80% výšky obrazovky */
+  max-height: none;
+  font-size: 1rem;
+  display: table;
+  overflow: auto;
+  border-radius: 0;
+  margin: 0;
+}
+
+:fullscreen th,
+:-webkit-full-screen th,
+:-moz-full-screen th,
+:-ms-fullscreen th {
+  padding: 12px 8px;
+  font-size: 1rem;
+  position: sticky;
+  top: 0;
+  background: #0d1117;
+  z-index: 100;
+  border-bottom: 2px solid #00d9ff;
+}
+
+:fullscreen td,
+:-webkit-full-screen td,
+:-moz-full-screen td,
+:-ms-fullscreen td {
+  padding: 10px 8px;
+  font-size: 0.95rem;
+  white-space: normal;
+  min-width: auto;
+  max-width: none;
+}
+
+/* Fullscreen container optimalizace */
+:fullscreen .container,
+:-webkit-full-screen .container,
+:-moz-full-screen .container,
+:-ms-fullscreen .container {
+  max-width: 100%;
+  padding: 20px;
+  height: 900vh;
+  overflow-y: auto;
+}
+
+:fullscreen .card,
+:-webkit-full-screen .card,
+:-moz-full-screen .card,
+:-ms-fullscreen .card {
+  margin: 10px 0;
+  padding: 20px;
+  height: auto;
+  min-height: auto;
+}
+
+/* Fullscreen dashboard optimalizace */
+:fullscreen .dashboard,
+:-webkit-full-screen .dashboard,
+:-moz-full-screen .dashboard,
+:-ms-fullscreen .dashboard {
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 20px;
+  height: auto;
+}
+
+/* Fullscreen grafy optimalizace */
+:fullscreen .charts-container,
+:-webkit-full-screen .charts-container,
+:-moz-full-screen .charts-container,
+:-ms-fullscreen .charts-container {
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  gap: 25px;
+  padding: 25px;
+  height: auto;
+}
+
+:fullscreen .chart-card,
+:-webkit-full-screen .chart-card,
+:-moz-full-screen .chart-card,
+:-ms-fullscreen .chart-card {
+  padding: 25px;
+  min-height: 400px;
+}
+
+:fullscreen .chart-card canvas,
+:-webkit-full-screen .chart-card canvas,
+:-moz-full-screen .chart-card canvas,
+:-ms-fullscreen .chart-card canvas {
+  max-height: 350px;
+  min-height: 300px;
+}
+
+/* Fullscreen statistiky */
+:fullscreen .stats,
+:-webkit-full-screen .stats,
+:-moz-full-screen .stats,
+:-ms-fullscreen .stats {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+:fullscreen .stat-item,
+:-webkit-full-screen .stat-item,
+:-moz-full-screen .stat-item,
+:-ms-fullscreen .stat-item {
+  padding: 20px 15px;
+}
+
+:fullscreen .stat-value,
+:-webkit-full-screen .stat-value,
+:-moz-full-screen .stat-value,
+:-ms-fullscreen .stat-value {
+  font-size: 2em;
+}
+
+:fullscreen .stat-label,
+:-webkit-full-screen .stat-label,
+:-moz-full-screen .stat-label,
+:-ms-fullscreen .stat-label {
+  font-size: 1em;
+}
+
+/* Fullscreen typography */
+:fullscreen h1,
+:-webkit-full-screen h1,
+:-moz-full-screen h1,
+:-ms-fullscreen h1 {
+  font-size: 2.5rem;
+  margin: 20px 0;
+}
+
+:fullscreen h2,
+:-webkit-full-screen h2,
+:-moz-full-screen h2,
+:-ms-fullscreen h2 {
+  font-size: 2rem;
+  margin: 15px 0;
+}
+
+:fullscreen h3,
+:-webkit-full-screen h3,
+:-moz-full-screen h3,
+:-ms-fullscreen h3 {
+  font-size: 1.5rem;
+}
+
+/* Fullscreen formuláře */
+:fullscreen input,
+:-webkit-full-screen input,
+:-moz-full-screen input,
+:-ms-fullscreen input,
+:fullscreen select,
+:-webkit-full-screen select,
+:-moz-full-screen select,
+:-ms-fullscreen select,
+:fullscreen textarea,
+:-webkit-full-screen textarea,
+:-moz-full-screen textarea,
+:-ms-fullscreen textarea {
+  padding: 15px 12px;
+  font-size: 1rem;
+}
+
+:fullscreen button,
+:-webkit-full-screen button,
+:-moz-full-screen button,
+:-ms-fullscreen button {
+  padding: 15px 25px;
+  font-size: 1rem;
+  margin: 8px;
+}
+
+/* Fullscreen taby */
+:fullscreen .tabs,
+:-webkit-full-screen .tabs,
+:-moz-full-screen .tabs,
+:-ms-fullscreen .tabs {
+  margin: 25px 0;
+}
+
+:fullscreen .tab,
+:-webkit-full-screen .tab,
+:-moz-full-screen .tab,
+:-ms-fullscreen .tab {
+  padding: 15px 25px;
+  font-size: 1.1rem;
+}
+
+/* Fullscreen na mobilech - speciální případy */
+@media (max-width: 768px) {
+  :fullscreen table,
+  :-webkit-full-screen table,
+  :-moz-full-screen table,
+  :-ms-fullscreen table {
+    height: 900vh;
+    font-size: 0.9rem;
+  }
+  
+  :fullscreen .dashboard,
+  :-webkit-full-screen .dashboard,
+  :-moz-full-screen .dashboard,
+  :-ms-fullscreen .dashboard {
+    grid-template-columns: 1fr;
+  }
+  
+  :fullscreen .charts-container,
+  :-webkit-full-screen .charts-container,
+  :-moz-full-screen .charts-container,
+  :-ms-fullscreen .charts-container {
+    grid-template-columns: 1fr;
+    padding: 15px;
+  }
+  
+  :fullscreen .chart-card,
+  :-webkit-full-screen .chart-card,
+  :-moz-full-screen .chart-card,
+  :-ms-fullscreen .chart-card {
+    min-height: 300px;
+    padding: 20px;
+  }
+}
+
+/* Fullscreen scrollbar styling pro lepší UX */
+:fullscreen ::-webkit-scrollbar,
+:-webkit-full-screen ::-webkit-scrollbar,
+:-moz-full-screen ::-webkit-scrollbar,
+:-ms-fullscreen ::-webkit-scrollbar {
+  width: 12px;
+}
+
+:fullscreen ::-webkit-scrollbar-track,
+:-webkit-full-screen ::-webkit-scrollbar-track,
+:-moz-full-screen ::-webkit-scrollbar-track,
+:-ms-fullscreen ::-webkit-scrollbar-track {
+  background: #1f2633;
+}
+
+:fullscreen ::-webkit-scrollbar-thumb,
+:-webkit-full-screen ::-webkit-scrollbar-thumb,
+:-moz-full-screen ::-webkit-scrollbar-thumb,
+:-ms-fullscreen ::-webkit-scrollbar-thumb {
+  background: #00d9ff;
+  border-radius: 6px;
+}
+
+:fullscreen ::-webkit-scrollbar-thumb:hover,
+:-webkit-full-screen ::-webkit-scrollbar-thumb:hover,
+:-moz-full-screen ::-webkit-scrollbar-thumb:hover,
+:-ms-fullscreen ::-webkit-scrollbar-thumb:hover {
+  background: #00b8cc;
+}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🖖 Pokročilý váhový tracker více admirála Jiříka</h1>
+    
+    <div class="notification" id="notification"></div>
+    <div class="alert" id="bmiAlert"></div>
+    
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('dashboard')">Dashboard</div>
+      <div class="tab" onclick="showTab('add-entry')">Nový záznam</div>
+      <div class="tab" onclick="showTab('goals')">Cíle</div>
+      <div class="tab" onclick="showTab('settings')">Nastavení</div>
+      <div class="tab" onclick="showTab('export')">Export/Import</div>
+    </div>
+
+    <div id="dashboard" class="tab-content active">
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-value" id="currentWeight">-</div>
+          <div class="stat-label">Aktuální váha (kg)</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="currentBMI">-</div>
+          <div class="stat-label">Aktuální BMI</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="weightChange">-</div>
+          <div class="stat-label">Změna váhy (kg)</div>
+        </div>
+         <div class="stat-item">
+          <div class="stat-value" id="currentBodyWater">-</div>
+          <div class="stat-label">Voda v těle (%)</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="lastManualBMR">-</div>
+          <div class="stat-label">Posl. zadaný BMR</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="lastManualAMR">-</div>
+          <div class="stat-label">Posl. zadaný AMR</div>
+        </div>
+         <div class="stat-item">
+          <div class="stat-value" id="theoreticalBMR">-</div>
+          <div class="stat-label">Teoretický BMR</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="theoreticalAMR">-</div>
+          <div class="stat-label">Teoretický AMR</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="goalProgress">-</div>
+          <div class="stat-label">Pokrok k cíli (%)</div>
+        </div>
+      </div>
+
+      <div id="goalProgressBarCard" class="card" style="display:none; margin-bottom: 20px;">
+        <h3>Pokrok k cíli</h3>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div id="goalStatus" style="text-align: center; margin-top: 10px; color: #00d9ff;"></div>
+        <div id="goalEstimate" class="stat-subtext" style="text-align: center; margin-top: 5px; color: #ccc;">Odhad: ...</div>
+        <div id="latestEntryDate" style="text-align: center; margin-top: 5px; font-size: 0.9em; color: #aaa;"></div>
+      </div>
+
+      <div class="charts-container">
+        <div class="chart-card">
+          <h3>Vývoj váhy</h3>
+          <canvas id="weightChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Vývoj BMI</h3>
+          <canvas id="bmiChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Vývoj tělesného tuku (%)</h3>
+          <canvas id="bodyFatOnlyChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Vývoj svalové hmoty (%)</h3> <canvas id="muscleMassOnlyChart"></canvas>
+        </div>
+         <div class="chart-card">
+          <h3>Vývoj vody v těle</h3>
+          <canvas id="bodyWaterChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Vývoj zadaného BMR (kcal)</h3>
+          <canvas id="manualBMRChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Vývoj zadaného AMR (kcal)</h3>
+          <canvas id="manualAMRChart"></canvas>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Datum</th>
+            <th>Váha</th>
+            <th>Rozdíl</th>
+            <th>BMI</th>
+            <th>Klasif.</th>
+            <th>Tuk%</th>
+            <th>Svaly (%)</th> <th>Voda%</th>
+            <th>Zad. BMR</th>
+            <th>Zad. AMR</th>
+            <th>Pozn.</th>
+            <th>Akce</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <div id="add-entry" class="tab-content">
+      <div class="card">
+        <h3>Přidat nový záznam</h3>
+        <form id="entryForm">
+          <div class="form-group">
+            <label for="entryDate">Datum:</label>
+            <input type="date" id="entryDate" required>
+          </div>
+          <div class="form-group">
+            <label for="entryWeight">Váha (kg):</label>
+            <input type="number" id="entryWeight" step="0.1" required>
+          </div>
+          <div class="form-group">
+            <label for="entryBodyFat">Tělesný tuk (%):</label>
+            <input type="number" id="entryBodyFat" step="0.1" min="0" max="100">
+          </div>
+          <div class="form-group">
+            <label for="entryMuscleMass">Svalová hmota (kg):</label>
+            <input type="number" id="entryMuscleMass" step="0.1" min="0">
+          </div>
+          <div class="form-group">
+            <label for="entryBodyWater">Voda v těle (%):</label>
+            <input type="number" id="entryBodyWater" step="0.1" min="0" max="100">
+          </div>
+          <div class="form-group">
+            <label for="entryManualBMR">Ručně zadané BMR (kcal):</label>
+            <input type="number" id="entryManualBMR" step="1" min="0">
+          </div>
+          <div class="form-group">
+            <label for="entryManualAMR">Ručně zadané AMR (kcal):</label>
+            <input type="number" id="entryManualAMR" step="1" min="0">
+          </div>
+          <div class="form-group">
+            <label for="entryNotes">Poznámky:</label>
+            <textarea id="entryNotes" rows="3"></textarea>
+          </div>
+          <button type="submit">Přidat záznam</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="goals" class="tab-content">
+      <div class="card">
+        <h3>Nastavení cílů</h3>
+        <form id="goalsForm">
+          <div class="form-group">
+            <label for="targetWeight">Cílová váha (kg):</label>
+            <input type="number" id="targetWeight" step="0.1">
+          </div>
+          <div class="form-group">
+            <label for="targetBMI">Cílové BMI:</label>
+            <input type="number" id="targetBMI" step="0.1">
+          </div>
+          <div class="form-group">
+            <label for="targetDate">Termín splnění cíle:</label>
+            <input type="date" id="targetDate">
+          </div>
+          <div class="form-group">
+            <label for="weeklyGoal">Týdenní změna váhy (kg) (např. -0.5 pro hubnutí):</label>
+            <input type="number" id="weeklyGoal" step="0.1">
+          </div>
+          <button type="submit">Uložit cíle</button>
+        </form>
+        
+        <div id="recommendations" class="card" style="margin-top: 20px; background: #2a3441;">
+          <h3>Doporučení</h3>
+          <div id="recommendationText"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="settings" class="tab-content">
+      <div class="dashboard">
+        <div class="card">
+          <h3>Osobní údaje (pro teoretické výpočty)</h3>
+          <form id="settingsForm">
+            <div class="form-group">
+              <label for="height">Výška (cm):</label>
+              <input type="number" id="height" min="100" max="250" value="174">
+            </div>
+            <div class="form-group">
+              <label for="age">Věk:</label>
+              <input type="number" id="age" min="1" max="120">
+            </div>
+            <div class="form-group">
+              <label for="gender">Pohlaví:</label>
+              <select id="gender">
+                <option value="male">Muž</option>
+                <option value="female">Žena</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="activityLevel">Úroveň fyzické aktivity:</label>
+              <select id="activityLevel">
+                <option value="1.2">Sedavé (málo nebo žádné cvičení)</option>
+                <option value="1.375">Lehce aktivní (cvičení 1-3 dny/týden)</option>
+                <option value="1.55">Mírně aktivní (cvičení 3-5 dní/týden)</option>
+                <option value="1.725">Velmi aktivní (cvičení 6-7 dní/týden)</option>
+                <option value="1.9">Extrémně aktivní (velmi těžké cvičení, fyzická práce)</option>
+              </select>
+            </div>
+            <button type="submit">Uložit nastavení</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>BMI hranice</h3>
+          <form id="bmiAlertsForm">
+            <div class="form-group">
+              <label for="bmiWarningUpper">Horní hranice BMI (varování):</label>
+              <input type="number" id="bmiWarningUpper" step="0.1" value="25">
+            </div>
+            <div class="form-group">
+              <label for="bmiDangerUpper">Horní hranice BMI (nebezpečí):</label>
+              <input type="number" id="bmiDangerUpper" step="0.1" value="30">
+            </div>
+            <div class="form-group">
+              <label for="bmiWarningLower">Dolní hranice BMI (varování):</label>
+              <input type="number" id="bmiWarningLower" step="0.1" value="18.5">
+            </div>
+            <button type="submit">Uložit hranice</button>
+          </form>
+        </div>
+
+        <div class="card">
+    <h3>Připomínky</h3>
+    <form id="remindersForm">
+        <div class="form-group">
+            <label for="reminderEnabled">Povolit připomínky:</label>
+            <input type="checkbox" id="reminderEnabled" style="width: auto;">
+        </div>
+        <div class="form-group">
+            <label for="reminderInterval">Interval připomínek (dny):</label>
+            <input type="number" id="reminderInterval" min="1" max="30" value="7">
+        </div>
+        <button type="submit">Uložit připomínky</button>
+        <button type="button" onclick="window.requestNotificationPermission()">🔔 Povolit webová upozornění</button>
+        </form>
+</div>
+      </div>
+    </div>
+
+    <div id="export" class="tab-content">
+      <div class="dashboard">
+        <div class="card">
+          <h3>Export dat</h3>
+          <button onclick="exportToCSV()">📊 Export do CSV</button>
+          <button onclick="exportToPDF()">📄 Export do PDF</button>
+          <button onclick="exportChartsAsPDF()">📈 Export grafů do PDF</button>
+          <button onclick="exportBackup()">💾 Úplná záloha</button>
+        </div>
+
+        <div class="card">
+          <h3>Import dat</h3>
+          <div class="form-group">
+            <label for="csvImport">Import CSV:</label>
+            <input type="file" id="csvImport" accept=".csv" onchange="importFromCSV(this)">
+          </div>
+          <div class="form-group">
+            <label for="backupImport">Obnovit ze zálohy:</label>
+            <input type="file" id="backupImport" accept=".json" onchange="importFromBackup(this)">
+          </div>
+          <button class="danger" onclick="clearAllData()">🗑️ Vymazat všechna data</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+   
+    <script>
+    // Globální proměnné (deklarace zůstává nahoře)
+    let weightChart, bmiChart, bodyFatOnlyChart, muscleMassOnlyChart, bodyWaterChart, manualBMRChart, manualAMRChart;
+    let weightLog = [];
+    let settings = {
+        height: 174,
+        age: 24,
+        gender: 'male',
+        activityLevel: 1.55,
+        bmiWarningUpper: 25,
+        bmiDangerUpper: 30,
+        bmiWarningLower: 18.5,
+        reminderEnabled: true,
+        reminderInterval: 7
+    };
+    let goals = {
+        targetWeight: 80,
+        targetBMI: 24.9,
+        targetDate: '2026-05-18',
+        weeklyGoal: null
+    };
+
+    const ACTIVITY_LEVELS = {
+        SEDENTARY: 1.2,
+        LIGHT: 1.375,
+        MODERATE: 1.55,
+        ACTIVE: 1.725,
+        VERY_ACTIVE: 1.9
+    };
+
+    // --- Zde začíná JavaScriptová logika tvého trackeru ---
+
+    // Funkce, které jsou volány z HTML atributů (onclick, onchange), musí být globální.
+    // Proto je připojujeme k objektu window.
+
+    window.setTodayDate = function() {
+        console.log("setTodayDate: Nastavuji dnešní datum pro vstupní pole.");
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('entryDate').value = today;
+    };
+
+    // loadData - Nyní primárně volá Firebase funkce, s fallbackem na LocalStorage a výchozí data
+    window.loadData = async function() {
+        console.log("loadData: Spuštěno načítání všech dat (váha, nastavení, cíle).");
+        const savedWeightLog = localStorage.getItem('weightLog_JirikTracker_v2_charts_separated_musclePercent');
+        const savedSettings = localStorage.getItem('weightSettings_JirikTracker_v2_charts_separated_musclePercent');
+        const savedGoals = localStorage.getItem('weightGoals_JirikTracker_v2_charts_separated_musclePercent');
+
+        let firestoreWeightDataLoaded = false;
+        let firestoreSettingsDataLoaded = false;
+        let firestoreGoalsDataLoaded = false;
+
+        try {
+            console.log("loadData: Pokouším se načíst data z Firebase Firestore (weightLog).");
+            const firestoreWeightData = await window.loadWeightLogFromFirestore();
+            if (firestoreWeightData && firestoreWeightData.length > 0) {
+                weightLog = firestoreWeightData;
+                firestoreWeightDataLoaded = true;
+                console.log("loadData: Data weightLog úspěšně načtena z Firebase Firestore.");
+            } else {
+                console.log("loadData: Žádná data weightLog v Firebase Firestore nebo kolekce prázdná.");
+            }
+
+            console.log("loadData: Pokouším se načíst nastavení z Firebase Firestore.");
+            const firestoreSettings = await window.loadSettingsFromFirestore();
+            if (firestoreSettings) {
+                settings = { ...settings, ...firestoreSettings }; // Sloučení načtených nastavení s výchozími
+                firestoreSettingsDataLoaded = true;
+                console.log("loadData: Nastavení úspěšně načtena z Firebase Firestore.");
+            } else {
+                console.log("loadData: Žádná nastavení v Firebase Firestore nebo dokument neexistuje.");
+            }
+
+            console.log("loadData: Pokouším se načíst cíle z Firebase Firestore.");
+            const firestoreGoals = await window.loadGoalsFromFirestore();
+            if (firestoreGoals) {
+                goals = { ...goals, ...firestoreGoals }; // Sloučení načtených cílů s výchozími
+                firestoreGoalsDataLoaded = true;
+                console.log("loadData: Cíle úspěšně načteny z Firebase Firestore.");
+            } else {
+                console.log("loadData: Žádné cíle v Firebase Firestore nebo dokument neexistuje.");
+            }
+
+        } catch (error) {
+            console.error("loadData: Kritická chyba při načítání dat z Firebase Firestore (pro všechny typy).", error);
+            window.showNotification("Chyba: Data z cloudu nebylo možné načíst. Pokouším se načíst lokální data.", 5000);
+        }
+
+        // Fallback pro weightLog
+        if (!firestoreWeightDataLoaded) {
+            console.log("loadData: Firestore weightLog nenačteno, pokouším se z LocalStorage.");
+            if (savedWeightLog) {
+                weightLog = JSON.parse(savedWeightLog);
+                console.log("loadData: Data weightLog načtena z LocalStorage.");
+            } else {
+                console.log("loadData: Žádná data weightLog v LocalStorage. Načítám výchozí data z kódu.");
+                // Příklad dat, aby bylo co zobrazit při prvním spuštění
+                weightLog = [
+                    //tvoje data prosím nemazat ani jeden zaznam je to důležité??
+{ date: "2024-05-25", weight: 133.6, bodyFat: 41.5, muscleMass: 31.0, bodyWater: 40.2, manualBMR: 2665 , manualAMR:3205, notes: "Start" },
+{ date: "2024-05-26", weight: 134.0, bodyFat: 41.8, muscleMass: 30.9, bodyWater: 40.0, manualBMR: 2676, manualAMR: 3211, notes: "" },
+{ date: "2024-06-01", weight: 134.0, bodyFat: 41.8, muscleMass: 30.9, bodyWater: 40.0, manualBMR: 2671, manualAMR: 3205, notes: "" },
+{ date: "2024-06-01", weight: 133.4, bodyFat: 42.0, muscleMass: 30.7, bodyWater: 39.8, manualBMR: 2670, manualAMR: 3194, notes: "" },
+{ date: "2024-06-07", weight: 132.2, bodyFat: 41.1, muscleMass: 31.2, bodyWater: 40.4, manualBMR: 2645, manualAMR: 3174, notes: "" },
+{ date: "2024-06-08", weight: 131.3, bodyFat: 40.9, muscleMass: 31.3, bodyWater: 40.6, manualBMR: 2632, manualAMR: 3158, notes: "" },
+{ date: "2024-06-08", weight: 131.3, bodyFat: 40.7, muscleMass: 31.4, bodyWater: 40.7, manualBMR: 2632, manualAMR: 3158, notes: "" },
+{ date: "2024-06-09", weight: 132.2, bodyFat: 42.8, muscleMass: 30.3, bodyWater: 39.3, manualBMR: 2645, manualAMR: 3174, notes: "" },
+{ date: "2024-06-11", weight: 131.5, bodyFat: 41.0, muscleMass: 31.2, bodyWater: 40.5, manualBMR: 2635, manualAMR: 3162, notes: "" },
+{ date: "2024-06-18", weight: 134.6, bodyFat: 42.2, muscleMass: 30.6, bodyWater: 39.7, manualBMR: 2678, manualAMR: 3213, notes: "" },
+{ date: "2024-06-20", weight: 134.4, bodyFat: 42.1, muscleMass: 30.7, bodyWater: 39.8, manualBMR: 2676, manualAMR: 3211, notes: "" },
+{ date: "2024-06-20", weight: 134.4, bodyFat: 42.0, muscleMass: 30.7, bodyWater: 39.8, manualBMR: 2676, manualAMR: 3211, notes: "" },
+{ date: "2024-06-21", weight: 136.7, bodyFat: 43.0, muscleMass: 30.2, bodyWater: 39.1, manualBMR: 2708, manualAMR: 3249, notes: "" },
+{ date: "2024-06-29", weight: 137.3, bodyFat: 43.4, muscleMass: 30.0, bodyWater: 38.9, manualBMR: 2716, manualAMR: 3259, notes: "" },
+{ date: "2024-07-03", weight: 136.9, bodyFat: 43.0, muscleMass: 30.2, bodyWater: 39.1, manualBMR: 2711, manualAMR: 3253, notes: "" },
+{ date: "2024-07-09", weight: 139.3, bodyFat: 44.0, muscleMass: 29.7, bodyWater: 38.5, manualBMR: 2744, manualAMR: 3292, notes: "" },
+{ date: "2024-09-08", weight: 138.6, bodyFat: 43.7, muscleMass: 29.9, bodyWater: 38.7, manualBMR: 2734, manualAMR: 3280, notes: "" },
+{ date: "2025-02-16", weight: 145.6, bodyFat: 46.5, muscleMass: 28.3, bodyWater: 36.7, manualBMR: 2831, manualAMR: 3397, notes: "" },
+{ date: "2025-04-19", weight: 146.3, bodyFat: 47.0, muscleMass: 28.1, bodyWater: 36.4, manualBMR: 2842, manualAMR: 3410, notes: "" },
+{ date: "2025-05-10", weight: 144.2, bodyFat: 45.8, muscleMass: 28.7, bodyWater: 37.2, manualBMR: 2806, manualAMR: 3367, notes: "" },
+{ date: "2025-05-13", weight: 141.3, bodyFat: 44.6, muscleMass: 29.3, bodyWater: 38.0, manualBMR: 2765, manualAMR: 3318, notes: "" },
+{ date: "2025-05-18", weight: 138.8, bodyFat: 43.7, muscleMass: 29.3, bodyWater: 38.7, manualBMR: 2731, manualAMR: 3277, notes: "" },
+{ date: "2025-05-19", weight: 139.3, bodyFat: 45.8, muscleMass: 28.7, bodyWater: 37.2, manualBMR: 2728, manualAMR: 3273, notes: "" },
+{ date: "2025-05-20", weight: 138.5, bodyFat: 45.5, muscleMass: 28.9, bodyWater: 37.4, manualBMR: 2716, manualAMR: 3259, notes: "" },  
+{ date: "2025-05-21", weight: 138.3, bodyFat: 45.4, muscleMass: 29.0, bodyWater: 37.5, manualBMR: 2713, manualAMR: 3255, notes: "" },  
+{ date: "2025-05-22", weight: 139.2, bodyFat: 45.7, muscleMass: 28.8, bodyWater: 37.3, manualBMR: 2725, manualAMR: 3270, notes: "" }, 
+{ date: "2025-05-23", weight: 139.2, bodyFat: 45.9, muscleMass: 28.7, bodyWater: 37.1, manualBMR: 2725, manualAMR: 3270, notes: "" },  
+{ date: "2025-05-24", weight: 139.7, bodyFat: 46.0, muscleMass: 28.7, bodyWater: 37.1, manualBMR: 2733, manualAMR: 3270, notes: "" },         
+{ date: "2025-05-25", weight: 140.3, bodyFat: 46.2, muscleMass: 28.5, bodyWater: 36.9, manualBMR: 2741, manualAMR: 3279, notes: "" },    
+{ date: "2025-05-31", weight: 140.0, bodyFat: 46.2, muscleMass: 28.7, bodyWater: 37.1, manualBMR: 2737, manualAMR: 3289, notes: "" },        
+{ date: "2025-06-01", weight: 140.0, bodyFat: 46.2, muscleMass: 28.5, bodyWater: 36.9, manualBMR: 2737, manualAMR: 3289, notes: "" },
+                ];
+                console.log("loadData: Načtena výchozí data z kódu.");
+            }
+        }
+
+        // Načítání settings a goals z LocalStorage, pokud nejsou z Firestore
+        if (!firestoreSettingsDataLoaded) { // Pokud settings nebyly načteny z Firestore
+            console.log("loadData: Firestore nastavení nenačteno, pokouším se z LocalStorage.");
+            if (savedSettings) {
+                settings = { ...settings, ...JSON.parse(savedSettings) };
+                console.log("loadData: Nastavení načtena z LocalStorage.");
+            } else {
+                console.log("loadData: Žádná nastavení v LocalStorage. Používám výchozí.");
+            }
+        } else {
+            console.log("loadData: Nastavení již načtena z Firestore, přeskočeno LocalStorage.");
+        }
+        
+        if (!firestoreGoalsDataLoaded) { // Pokud goals nebyly načteny z Firestore
+            console.log("loadData: Firestore cíle nenačteny, pokouším se z LocalStorage.");
+            if (savedGoals) {
+                goals = { ...goals, ...JSON.parse(savedGoals) };
+                console.log("loadData: Cíle načteny z LocalStorage.");
+            } else {
+                console.log("loadData: Žádné cíle v LocalStorage. Používám výchozí.");
+            }
+        } else {
+            console.log("loadData: Cíle již načteny z Firestore, přeskočeno LocalStorage.");
+        }
+
+        settings.activityLevel = parseFloat(settings.activityLevel) || 1.55;
+        console.log("loadData: Dokončeno načítání dat. Aktualizuji formuláře.");
+        window.updateForms(); // Voláme globální updateForms()
+
+        // Prvotní uložení dat do Firebase, pokud byla načtena z LocalStorage nebo kódu
+        // a nejsou již ve Firestore.
+        if (!firestoreWeightDataLoaded && (weightLog.length > 0 || savedWeightLog)) {
+            console.log("loadData: Detekována chybějící data weightLog ve Firestore. Ukládám aktuální data do cloudu.");
+            await window.saveData(); // Uloží aktuální weightLog, settings, goals do Firestore
+        } else if (!firestoreSettingsDataLoaded && savedSettings) {
+            console.log("loadData: Detekována chybějící nastavení ve Firestore. Ukládám aktuální nastavení do cloudu.");
+            await window.saveData(); // Uloží aktuální weightLog, settings, goals do Firestore
+        } else if (!firestoreGoalsDataLoaded && savedGoals) {
+            console.log("loadData: Detekovány chybějící cíle ve Firestore. Ukládám aktuální cíle do cloudu.");
+            await window.saveData(); // Uloží aktuální weightLog, settings, goals do Firestore
+        }
+        console.log("loadData: Načítání dat dokončeno pro všechny zdroje.");
+    };
+
+    // saveData - Nyní ukládá do LocalStorage a Firebase
+    window.saveData = async function() {
+        console.log("saveData: Spuštěno ukládání všech dat (váha, nastavení, cíle) do LocalStorage a Firebase.");
+        localStorage.setItem('weightLog_JirikTracker_v2_charts_separated_musclePercent', JSON.stringify(weightLog));
+        localStorage.setItem('weightSettings_JirikTracker_v2_charts_separated_musclePercent', JSON.stringify(settings));
+        localStorage.setItem('weightGoals_JirikTracker_v2_charts_separated_musclePercent', JSON.stringify(goals));
+        console.log("saveData: Data úspěšně uložena do LocalStorage.");
+
+        try {
+            // Ukládáme weightLog do Firebase Firestore
+            console.log("saveData: Pokouším se uložit weightLog do Firebase Firestore.");
+            // Tato funkce (window.saveWeightLogToFirestore) je definována v firebaseFunctions.js
+            await window.saveWeightLogToFirestore(weightLog);
+            console.log("saveData: Data weightLog úspěšně uložena do Firebase Firestore.");
+            
+            // Ukládáme settings do Firebase Firestore
+            console.log("saveData: Pokouším se uložit nastavení do Firebase Firestore.");
+            await window.saveSettingsToFirestore(settings);
+            console.log("saveData: Nastavení úspěšně uložena do Firebase Firestore.");
+
+            // Ukládáme goals do Firebase Firestore
+            console.log("saveData: Pokouším se uložit cíle do Firebase Firestore.");
+            await window.saveGoalsToFirestore(goals);
+            console.log("saveData: Cíle úspěšně uloženy do Firebase Firestore.");
+
+        } catch (error) {
+            console.error("saveData: Nepodařilo se uložit data do Firebase Firestore:", error);
+            window.showNotification("Chyba: Data se nepodařilo uložit do cloudu!", 4000);
+        }
+        console.log("saveData: Ukládání dat dokončeno pro všechny cíle.");
+    };
+
+    window.updateForms = function() {
+        console.log("updateForms: Aktualizuji hodnoty formulářových polí.");
+        document.getElementById('height').value = settings.height || '';
+        document.getElementById('age').value = settings.age || '';
+        document.getElementById('gender').value = settings.gender || 'male';
+        document.getElementById('activityLevel').value = settings.activityLevel || '1.55';
+        document.getElementById('bmiWarningUpper').value = settings.bmiWarningUpper || '';
+        document.getElementById('bmiDangerUpper').value = settings.bmiDangerUpper || '';
+        document.getElementById('bmiWarningLower').value = settings.bmiWarningLower || '';
+        document.getElementById('reminderEnabled').checked = settings.reminderEnabled === true;
+        document.getElementById('reminderInterval').value = settings.reminderInterval || 7;
+
+        document.getElementById('targetWeight').value = goals.targetWeight || '';
+        document.getElementById('targetBMI').value = goals.targetBMI || '';
+        document.getElementById('targetDate').value = goals.targetDate || '';
+        document.getElementById('weeklyGoal').value = goals.weeklyGoal || '';
+        console.log("updateForms: Formuláře aktualizovány.");
+    };
+
+    window.calculateBMI = function(weight, height) {
+        // console.log("calculateBMI: Počítám BMI."); // Velmi časté volání, může zahltit log
+        if (!height || height <=0 || !weight || weight <=0) return 0;
+        const heightInMeters = height / 100;
+        return weight / (heightInMeters * heightInMeters);
+    };
+
+    window.calculateBMR = function(weight, height, age, gender) {
+        // console.log("calculateBMR: Počítám BMR."); // Velmi časté volání
+        if (!weight || !height || !age || !gender) return 0;
+        if (gender === 'male') {
+            return (10 * weight) + (6.25 * height) - (5 * age) + 5;
+        } else {
+            return (10 * weight) + (6.25 * height) - (5 * age) - 161;
+        }
+    };
+
+    window.calculateAMR = function(bmr, activityLevel) {
+        // console.log("calculateAMR: Počítám AMR."); // Velmi časté volání
+        if (!bmr || !activityLevel) return 0;
+        return bmr * activityLevel;
+    };
+
+    window.classifyBMI = function(bmi) {
+        // console.log("classifyBMI: Klasifikuji BMI."); // Velmi časté volání
+        if (bmi === 0) return { class: '', text: '-' };
+        if (bmi < 18.5) return { class: 'bmi-underweight', text: 'Podváha' };
+        if (bmi < 25) return { class: 'bmi-normal', text: 'Normální' };
+        if (bmi < 30) return { class: 'bmi-overweight', text: 'Nadváha' };
+        return { class: 'bmi-obese', text: 'Obezita' };
+    };
+
+    window.checkBMIAlert = function(bmi) {
+        console.log("checkBMIAlert: Kontroluji BMI pro upozornění.");
+        const alertEl = document.getElementById('bmiAlert');
+        if (bmi === 0) {
+            alertEl.className = 'alert';
+            console.log("checkBMIAlert: BMI je 0, upozornění skryto.");
+            return;
+        }
+        if (bmi > settings.bmiDangerUpper) {
+            alertEl.innerHTML = `⚠️ Varování: Vaše BMI (${bmi.toFixed(1)}) je výrazně nad doporučenou hranicí!`;
+            alertEl.className = 'alert show';
+            alertEl.style.background = '#ff5555';
+            console.warn(`checkBMIAlert: BMI (${bmi.toFixed(1)}) je v nebezpečném pásmu.`);
+        } else if (bmi > settings.bmiWarningUpper) {
+            alertEl.innerHTML = `⚡ Upozornění: Vaše BMI (${bmi.toFixed(1)}) překračuje doporučenou hranici.`;
+            alertEl.className = 'alert show';
+            alertEl.style.background = '#ffaa00';
+            console.warn(`checkBMIAlert: BMI (${bmi.toFixed(1)}) je v varovném pásmu.`);
+        } else if (bmi < settings.bmiWarningLower && bmi > 0) {
+            alertEl.innerHTML = `⚡ Upozornění: Vaše BMI (${bmi.toFixed(1)}) je pod doporučenou hranicí.`;
+            alertEl.className = 'alert show';
+            alertEl.style.background = '#00aaff';
+            console.warn(`checkBMIAlert: BMI (${bmi.toFixed(1)}) je pod doporučenou hranicí.`);
+        } else {
+            alertEl.className = 'alert';
+            console.log("checkBMIAlert: BMI je v normě, upozornění skryto.");
+        }
+    };
+
+    window.showNotification = function(message, duration = 3000) {
+        console.log(`showNotification: Zobrazuji notifikaci: "${message}"`);
+        const notification = document.getElementById('notification');
+        notification.textContent = message;
+        notification.style.display = 'block';
+        setTimeout(() => {
+            notification.style.display = 'none';
+            console.log("showNotification: Notifikace skryta.");
+        }, duration);
+    };
+
+    window.showTab = function(tabName) {
+        console.log(`showTab: Přepínám na záložku: ${tabName}`);
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.add('active');
+        document.getElementById(tabName).classList.add('active');
+        console.log(`showTab: Záložka '${tabName}' aktivována.`);
+    };
+    
+    window.formatDateForDisplay = function(dateStr) {
+        // console.log("formatDateForDisplay: Formátuji datum pro zobrazení."); // Velmi časté volání
+        if (!dateStr) return '-';
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) {
+            console.warn(`formatDateForDisplay: Neplatné datum: ${dateStr}`);
+            return 'Neplatné datum';
+        }
+        const day = date.getDate();
+        const month = date.getMonth() + 1;
+        const year = date.getFullYear();
+        return `${day}. ${month}. ${year}`;
+    };
+
+    window.initializeCharts = function() {
+        console.log("initializeCharts: Spuštěna inicializace grafů.");
+        const commonOptions = (yLabel, xLabelColor = '#00d9ff', yLabelColor = '#00d9ff', gridColor = '#444', yPrecision = 1) => ({
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: false, grid: { color: gridColor }, ticks: { color: yLabelColor, precision: yPrecision }, title: { display: !!yLabel, text: yLabel, color: yLabelColor } },
+                x: { grid: { color: gridColor }, ticks: { color: xLabelColor, autoSkip: true, maxTicksLimit: 10 } }
+            }, plugins: { legend: { labels: { color: xLabelColor } } }
+        });
+        
+        const lineChartDataset = (label, data, borderColor, bgColor) => ({
+            label: label, data: data, borderColor: borderColor, backgroundColor: bgColor,
+            tension: 0.1, pointBackgroundColor: borderColor, pointBorderColor: '#fff',
+            pointRadius: 4, pointHoverRadius: 6
+        });
+
+        // Destroy existing chart instances before re-initializing
+        console.log("initializeCharts: Ničím existující instance grafů pro znovuinicializaci.");
+        if (weightChart) weightChart.destroy();
+        if (bmiChart) bmiChart.destroy();
+        if (bodyFatOnlyChart) bodyFatOnlyChart.destroy();
+        if (muscleMassOnlyChart) muscleMassOnlyChart.destroy();
+        if (bodyWaterChart) bodyWaterChart.destroy();
+        if (manualBMRChart) manualBMRChart.destroy();
+        if (manualAMRChart) manualAMRChart.destroy();
+
+        weightChart = new Chart(document.getElementById('weightChart').getContext('2d'), { type: 'line', data: { labels: [], datasets: [lineChartDataset('Váha (kg)', [], '#00d9ff', 'rgba(0,217,255,0.2)')] }, options: commonOptions('Váha (kg)') });
+        bmiChart = new Chart(document.getElementById('bmiChart').getContext('2d'), { type: 'line', data: { labels: [], datasets: [lineChartDataset('BMI', [], '#55ff99', 'rgba(85,255,153,0.2)')] }, options: commonOptions('BMI') });
+        bodyWaterChart = new Chart(document.getElementById('bodyWaterChart').getContext('2d'), { type: 'line', data: { labels: [], datasets: [lineChartDataset('Voda v těle (%)', [], '#00aaff', 'rgba(0,170,255,0.2)')] }, options: commonOptions('Voda v těle (%)') });
+        manualBMRChart = new Chart(document.getElementById('manualBMRChart').getContext('2d'), { type: 'line', data: { labels: [], datasets: [lineChartDataset('Zadané BMR (kcal)', [], '#ff9933', 'rgba(255,153,51,0.2)')] }, options: commonOptions('BMR (kcal)', undefined, undefined, undefined, 0) });
+        manualAMRChart = new Chart(document.getElementById('manualAMRChart').getContext('2d'), { type: 'line', data: { labels: [], datasets: [lineChartDataset('Zadané AMR (kcal)', [], '#cc66ff', 'rgba(204,102,255,0.2)')] }, options: commonOptions('AMR (kcal)', undefined, undefined, undefined, 0) });
+        bodyFatOnlyChart = new Chart(document.getElementById('bodyFatOnlyChart').getContext('2d'), { type: 'line', data: { labels: [], datasets: [lineChartDataset('Tělesný tuk (%)', [], '#ff5555', 'rgba(255,85,85,0.2)')]}, options: commonOptions('Tuk (%)') });
+        muscleMassOnlyChart = new Chart(document.getElementById('muscleMassOnlyChart').getContext('2d'), { type: 'line', data: { labels: [], datasets: [lineChartDataset('Svalová hmota (%)', [], '#ffff55', 'rgba(255,255,85,0.2)')]}, options: commonOptions('Svaly (%)') });
+        console.log("initializeCharts: Grafy inicializovány.");
+    };
+
+    window.updateCharts = function() {
+        console.log("updateCharts: Aktualizuji data v grafech.");
+        if (!weightLog || weightLog.length === 0) {
+            console.log("updateCharts: Žádná data pro aktualizaci grafů.");
+            return;
+        }
+        const sortedData = [...weightLog].sort((a, b) => new Date(a.date) - new Date(b.date));
+        const labels = sortedData.map(entry => window.formatDateForDisplay(entry.date)); // Voláme globální formátování
+        
+        const weights = sortedData.map(entry => entry.weight);
+        const bmis = sortedData.map(entry => window.calculateBMI(entry.weight, settings.height).toFixed(1)); // Voláme globální výpočet
+        const bodyFats = sortedData.map(entry => entry.bodyFat);
+        
+        const muscleMassPercentages = sortedData.map(entry => {
+            if (entry.muscleMass && entry.weight && entry.weight > 0) {
+                return parseFloat(((entry.muscleMass / entry.weight) * 100).toFixed(1));
+            }
+            return NaN;
+        });
+
+        const bodyWaters = sortedData.map(entry => entry.bodyWater);
+        const manualBMRs = sortedData.map(entry => entry.manualBMR);
+        const manualAMRs = sortedData.map(entry => entry.manualAMR);
+
+
+        weightChart.data.labels = labels; weightChart.data.datasets[0].data = weights; weightChart.update();
+        bmiChart.data.labels = labels; bmiChart.data.datasets[0].data = bmis; bmiChart.update();
+        bodyWaterChart.data.labels = labels; bodyWaterChart.data.datasets[0].data = bodyWaters.map(bw => bw === null || bw === undefined ? NaN : bw); bodyWaterChart.update();
+        manualBMRChart.data.labels = labels; manualBMRChart.data.datasets[0].data = manualBMRs.map(val => val === null || val === undefined ? NaN : val); manualBMRChart.update();
+        manualAMRChart.data.labels = labels; manualAMRChart.data.datasets[0].data = manualAMRs.map(val => val === null || val === undefined ? NaN : val); manualAMRChart.update();
+        bodyFatOnlyChart.data.labels = labels; bodyFatOnlyChart.data.datasets[0].data = bodyFats.map(bf => bf === null || bf === undefined ? NaN : bf); bodyFatOnlyChart.update();
+        muscleMassOnlyChart.data.labels = labels; muscleMassOnlyChart.data.datasets[0].data = muscleMassPercentages; muscleMassOnlyChart.update();
+        console.log("updateCharts: Grafy úspěšně aktualizovány.");
+    };
+
+    window.updateTable = function() {
+        console.log("updateTable: Aktualizuji tabulku záznamů.");
+        const tableBody = document.getElementById('tableBody');
+        tableBody.innerHTML = ''; // Vyprázdním tabulku před novým naplněním
+        if (!weightLog || settings.height <=0) {
+            console.log("updateTable: Žádná data nebo nastavení výšky pro zobrazení tabulky.");
+            return;
+        }
+
+        const sortedData = [...weightLog].sort((a, b) => new Date(b.date) - new Date(a.date)); // Řadíme od nejnovějšího
+        console.log(`updateTable: Zpracovávám ${sortedData.length} záznamů pro tabulku.`);
+        
+        sortedData.forEach((entry, index) => {
+            const bmi = window.calculateBMI(entry.weight, settings.height);
+            const classification = window.classifyBMI(bmi);
+            
+            let weightDiffText = '-';
+            let diffClass = '';
+            // Nalezení předchozího záznamu v chronologickém pořadí pro výpočet rozdílu
+            const chronologicalLog = [...weightLog].sort((a, b) => new Date(a.date) - new Date(b.date));
+            const currentEntryIndexChronological = chronologicalLog.findIndex(e => e.date === entry.date);
+            const previousChronologicalEntry = currentEntryIndexChronological > 0 ? chronologicalLog[currentEntryIndexChronological -1] : null;
+
+            if (previousChronologicalEntry) {
+                const weightDiff = (entry.weight - previousChronologicalEntry.weight);
+                weightDiffText = (weightDiff > 0 ? '+' : '') + weightDiff.toFixed(1);
+                diffClass = weightDiff > 0 ? 'gain' : (weightDiff < 0 ? 'loss' : '');
+            }
+
+            let muscleMassDisplay = '-';
+            if (entry.muscleMass && entry.weight && entry.weight > 0) {
+                muscleMassDisplay = ((entry.muscleMass / entry.weight) * 100).toFixed(1) + '%';
+            }
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${sortedData.length - index}</td>
+                <td>${window.formatDateForDisplay(entry.date)}</td>
+                <td>${entry.weight !== null && entry.weight !== undefined ? entry.weight.toFixed(1) : '-'}</td>
+                <td class="${diffClass}">${weightDiffText}</td>
+                <td class="${classification.class}">${bmi > 0 ? bmi.toFixed(1) : '-'}</td>
+                <td class="${classification.class}">${classification.text}</td>
+                <td>${entry.bodyFat !== null && entry.bodyFat !== undefined ? entry.bodyFat.toFixed(1) : '-'}%</td>
+                <td>${muscleMassDisplay}</td>
+                <td>${entry.bodyWater !== null && entry.bodyWater !== undefined ? entry.bodyWater.toFixed(1) : '-'}%</td>
+                <td>${entry.manualBMR !== null && entry.manualBMR !== undefined ? entry.manualBMR : '-'}</td>
+                <td>${entry.manualAMR !== null && entry.manualAMR !== undefined ? entry.manualAMR : '-'}</td>
+                <td title="${entry.notes || ''}">${(entry.notes || '').substring(0,10)}${(entry.notes || '').length > 10 ? '...' : ''}</td>
+                <td>
+                    <button class="danger" onclick="deleteEntry('${entry.date}')" title="Smazat">🗑️</button>
+                    <button onclick="editEntry('${entry.date}')" title="Upravit">✏️</button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+        console.log("updateTable: Tabulka úspěšně aktualizována.");
+    };
+    
+    window.updateStats = function() {
+        console.log("updateStats: Aktualizuji statistiky.");
+        if (weightLog.length === 0) {
+            console.log("updateStats: Žádná data pro zobrazení statistik.");
+            document.getElementById('currentWeight').textContent = '-';
+            document.getElementById('currentBMI').textContent = '-';
+            document.getElementById('currentBMI').className = 'stat-value';
+            document.getElementById('weightChange').textContent = '-';
+            document.getElementById('weightChange').className = 'stat-value';
+            document.getElementById('currentBodyWater').textContent = '-';
+            document.getElementById('lastManualBMR').textContent = '-';
+            document.getElementById('lastManualAMR').textContent = '-';
+            document.getElementById('theoreticalBMR').textContent = '-';
+            document.getElementById('theoreticalAMR').textContent = '-';
+            document.getElementById('goalProgress').textContent = '-';
+            document.getElementById('goalProgressBarCard').style.display = 'none';
+            document.getElementById('latestEntryDate').textContent = 'Žádná data k zobrazení.';
+            return;
+        }
+
+        const sortedLog = [...weightLog].sort((a, b) => new Date(a.date) - new Date(b.date));
+        const latestEntry = sortedLog[sortedLog.length - 1];
+        
+        const currentWeight = latestEntry.weight;
+        const currentBMI = window.calculateBMI(currentWeight, settings.height);
+        const currentBodyWater = latestEntry.bodyWater;
+
+        document.getElementById('currentWeight').textContent = currentWeight.toFixed(1);
+        document.getElementById('currentBMI').textContent = currentBMI > 0 ? currentBMI.toFixed(1) : '-';
+        document.getElementById('currentBMI').className = 'stat-value ' + window.classifyBMI(currentBMI).class;
+        document.getElementById('currentBodyWater').textContent = currentBodyWater !== null && currentBodyWater !== undefined ? currentBodyWater.toFixed(1) : '-';
+        document.getElementById('lastManualBMR').textContent = latestEntry.manualBMR !== null && latestEntry.manualBMR !== undefined ? latestEntry.manualBMR : '-';
+        document.getElementById('lastManualAMR').textContent = latestEntry.manualAMR !== null && latestEntry.manualAMR !== undefined ? latestEntry.manualAMR : '-';
+
+        let weightChangeVal = 0;
+        let weightChangeText = '-';
+        let changeClass = '';
+        if (sortedLog.length >= 2) {
+            const previousEntry = sortedLog[sortedLog.length - 2];
+            weightChangeVal = currentWeight - previousEntry.weight;
+            weightChangeText = (weightChangeVal >= 0 ? '+' : '') + weightChangeVal.toFixed(1);
+            changeClass = weightChangeVal > 0 ? 'gain' : (weightChangeVal < 0 ? 'loss' : '');
+        }
+        document.getElementById('weightChange').textContent = weightChangeText;
+        document.getElementById('weightChange').className = 'stat-value ' + changeClass;
+
+        const theoBMR = window.calculateBMR(currentWeight, settings.height, settings.age, settings.gender);
+        const theoAMR = window.calculateAMR(theoBMR, settings.activityLevel);
+        document.getElementById('theoreticalBMR').textContent = theoBMR > 0 ? Math.round(theoBMR) : '-';
+        document.getElementById('theoreticalAMR').textContent = theoAMR > 0 ? Math.round(theoAMR) : '-';
+        
+        document.getElementById('latestEntryDate').textContent = `Poslední záznam: ${window.formatDateForDisplay(latestEntry.date)}`;
+
+        if (goals.targetWeight && sortedLog.length > 0) {
+            console.log("updateStats: Počítám pokrok k cíli.");
+            const initialWeight = sortedLog[0].weight;
+            const totalChangeNeeded = goals.targetWeight - initialWeight;
+            const currentChangeAchieved = currentWeight - initialWeight;
+            let progressPercent = 0;
+
+            if (totalChangeNeeded !== 0) {
+                if ((totalChangeNeeded < 0 && currentWeight <= initialWeight && currentWeight >= goals.targetWeight) ||
+                    (totalChangeNeeded > 0 && currentWeight >= initialWeight && currentWeight <= goals.targetWeight)) {
+                    progressPercent = (Math.abs(currentChangeAchieved) / Math.abs(totalChangeNeeded)) * 100;
+                } else if ((totalChangeNeeded < 0 && currentWeight < goals.targetWeight) || (totalChangeNeeded > 0 && currentWeight > goals.targetWeight)) {
+                    progressPercent = 100;
+                } else {
+                    progressPercent = 0;
+                }
+            } else {
+                progressPercent = (initialWeight === currentWeight) ? 100 : 0;
+            }
+            progressPercent = Math.min(100, Math.max(0, progressPercent));
+
+            document.getElementById('goalProgress').textContent = `${progressPercent.toFixed(1)}%`;
+            document.getElementById('goalProgressBarCard').style.display = 'block';
+            document.getElementById('progressFill').style.width = `${progressPercent}%`;
+            
+            const remainingKg = goals.targetWeight - currentWeight;
+            if (progressPercent >= 100) {
+                window.document.getElementById('goalStatus').textContent = `🎉 Cíl ${goals.targetWeight} kg dosažen/překonán!`;
+            } else {
+                window.document.getElementById('goalStatus').textContent = `Zbývá: ${remainingKg.toFixed(1)} kg do cíle (${goals.targetWeight} kg)`;
+            }
+
+            const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+            const now = new Date();
+            const recentLog = sortedLog.filter(entry => (now - new Date(entry.date)) <= THIRTY_DAYS_MS);
+
+            if (recentLog.length >= 2 && remainingKg !== 0) {
+                const oldestRecent = recentLog[0];
+                const latestRecent = recentLog[recentLog.length - 1];
+                const daysElapsed = Math.max(1, Math.floor((new Date(latestRecent.date) - new Date(oldestRecent.date)) / (1000 * 60 * 60 * 24)));
+                const weightChangeInPeriod = latestRecent.weight - oldestRecent.weight;
+                const dailyChange = weightChangeInPeriod / daysElapsed;
+                let estimateText = 'Nedostatek dat pro odhad.';
+
+                if (dailyChange !== 0 && ((remainingKg < 0 && dailyChange < 0) || (remainingKg > 0 && dailyChange > 0))) {
+                    const estimatedDays = Math.abs(remainingKg / dailyChange);
+                    if (estimatedDays > 365 * 3) {
+                        estimateText = 'Odhad: více než 3 roky';
+                    } else if (estimatedDays > 365) {
+                        estimateText = `Odhad: cca ${Math.round(estimatedDays/30.44)} měsíců`;
+                    } else {
+                        estimateText = `Odhad: cca ${Math.round(estimatedDays)} dní (~${Math.round(estimatedDays / 7)} týdnů)`;
+                    }
+                } else if (dailyChange === 0 && remainingKg !== 0) {
+                    estimateText = 'Odhad: stagnace, cíl se nepřibližuje.';
+                } else if (remainingKg !== 0) {
+                    estimateText = 'Odhad: aktuálně se vzdalujete od cíle.';
+                }
+                document.getElementById('goalEstimate').textContent = estimateText;
+            } else if (remainingKg === 0) {
+                document.getElementById('goalEstimate').textContent = 'Cíl dosažen!';
+            } else {
+                document.getElementById('goalEstimate').textContent = 'Nedostatek dat za posl. 30 dní pro odhad.';
+            }
+        } else {
+            document.getElementById('goalProgress').textContent = '-';
+            document.getElementById('goalProgressBarCard').style.display = 'none';
+            document.getElementById('goalEstimate').textContent = 'Cíl není nastaven.';
+        }
+        window.checkBMIAlert(currentBMI);
+        console.log("updateStats: Statistiky aktualizovány.");
+    };
+
+    window.updateRecommendations = function() {
+        console.log("updateRecommendations: Aktualizuji doporučení.");
+        if (weightLog.length === 0 ) {
+            document.getElementById('recommendationText').innerHTML = '<p>Pro doporučení zadejte více dat.</p>';
+            console.log("updateRecommendations: Žádná data pro generování doporučení.");
+            return;
+        }
+        const sortedDataDesc = [...weightLog].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const latestEntry = sortedDataDesc[0];
+        const currentWeight = latestEntry.weight;
+        const currentBMI = window.calculateBMI(currentWeight, settings.height);
+        
+        let recommendations = [];
+
+        if (currentBMI > 0) {
+            if (currentBMI < 18.5) recommendations.push("💚 Vaše BMI naznačuje podváhu. Zvažte konzultaci s lékařem o zdravém přírůstku váhy.");
+            else if (currentBMI > settings.bmiDangerUpper) recommendations.push("❤️ Vaše BMI je v pásmu obezity. Důrazně doporučujeme konzultaci s lékařem a úpravu životního stylu.");
+            else if (currentBMI > settings.bmiWarningUpper) recommendations.push("💛 Vaše BMI signalizuje nadváhu. Doporučujeme zaměřit se na vyváženou stravu a pravidelný pohyb.");
+            else recommendations.push("✅ Vaše BMI je v normálním rozmezí. Udržujte si zdravý životní styl!");
+        } else if(settings.height) {
+            recommendations.push("⚠️ Zadejte výšku pro výpočet BMI a relevantní doporučení.");
+        }
+
+        const sevenDaysAgo = new Date(new Date().setDate(new Date().getDate() - 7));
+        const fourteenDaysAgo = new Date(new Date().setDate(new Date().getDate() - 14));
+        
+        const last7DaysEntries = weightLog.filter(e => new Date(e.date) >= sevenDaysAgo);
+        const prev7DaysEntries = weightLog.filter(e => new Date(e.date) >= fourteenDaysAgo && new Date(e.date) < sevenDaysAgo);
+
+        if (last7DaysEntries.length > 1 && prev7DaysEntries.length > 1) {
+            const avgLast7 = last7DaysEntries.reduce((sum, e) => sum + e.weight, 0) / last7DaysEntries.length;
+            const avgPrev7 = prev7DaysEntries.reduce((sum, e) => sum + e.weight, 0) / prev7DaysEntries.length;
+            const weeklyTrend = avgLast7 - avgPrev7;
+
+            if (Math.abs(weeklyTrend) > 1.5) {
+                recommendations.push(`⚠️ Rychlá změna váhy (${weeklyTrend.toFixed(1)} kg/týden průměrně). Zvažte pozvolnější tempo (ideálně 0.5-1 kg/týden).`);
+            } else if (weeklyTrend !== 0) {
+                recommendations.push(`📈 Týdenní trend váhy: ${weeklyTrend.toFixed(1)} kg. Pokračujte ve svém úsilí!`);
+            }
+        } else if (last7DaysEntries.length >=2) {
+            const sortedWeek = last7DaysEntries.sort((a,b) => new Date(a.date) - new Date(b.date));
+            const weekChange = sortedWeek[sortedWeek.length-1].weight - sortedWeek[0].weight;
+            if (Math.abs(weekChange) > 1.5) {
+                recommendations.push(`⚠️ Rychlá změna váhy za poslední dny: ${weekChange.toFixed(1)} kg. Doporučujeme pozvolnější změny.`);
+            }
+        }
+
+        if (goals.targetWeight && goals.targetDate) {
+            console.log("updateRecommendations: Počítám doporučení pro cíle.");
+            const daysToGoal = Math.ceil((new Date(goals.targetDate) - new Date()) / (1000 * 60 * 60 * 24));
+            const weightToChange = goals.targetWeight - currentWeight;
+            
+            if (daysToGoal > 0 && weightToChange !== 0) {
+                const requiredWeeklyChange = (weightToChange / (daysToGoal / 7)).toFixed(1);
+                recommendations.push(`🎯 Pro dosažení cíle (${goals.targetWeight} kg) do ${window.formatDateForDisplay(goals.targetDate)}, je potřeba průměrná týdenní změna ${requiredWeeklyChange} kg.`);
+                if (Math.abs(requiredWeeklyChange) > 1.5) {
+                    recommendations.push("💡 Tento týdenní cíl je poměrně ambiciózní. Ujistěte se, že je udržitelný a zdravý.");
+                }
+            } else if (weightToChange === 0) {
+                recommendations.push(`🎯 Cílová váha ${goals.targetWeight} kg dosažena! Gratulujeme!`);
+            } else if (daysToGoal <=0 && weightToChange !==0) {
+                recommendations.push(`🗓️ Termín pro cíl ${goals.targetWeight} kg již vypršel. Zvažte nastavení nového cíle.`);
+            }
+        } else if (goals.targetWeight) {
+            const weightToChange = goals.targetWeight - currentWeight;
+            if (weightToChange === 0) recommendations.push(`🎯 Cílová váha ${goals.targetWeight} kg dosažena!`);
+            else recommendations.push(`🎯 Cíl: ${goals.targetWeight} kg. Aktuálně zbývá ${weightToChange.toFixed(1)} kg.`);
+        }
+
+        const theoBMR = window.calculateBMR(currentWeight, settings.height, settings.age, settings.gender);
+        const theoAMR = window.calculateAMR(theoBMR, settings.activityLevel);
+        
+        if (theoAMR > 0 && goals.weeklyGoal) {
+            const weeklyCalDeficitOrSurplus = goals.weeklyGoal * 7700;
+            const dailyCalAdjustment = weeklyCalDeficitOrSurplus / 7;
+            const targetCalories = Math.round(theoAMR + dailyCalAdjustment);
+            let goalType = goals.weeklyGoal < 0 ? "hubnutí" : (goals.weeklyGoal > 0 ? "nabírání" : "udržování");
+
+            recommendations.push(`🔥 Pro týdenní cíl ${goals.weeklyGoal} kg (${goalType}), váš odhadovaný denní příjem by mohl být okolo ${targetCalories} kcal (Teoretický AMR: ${Math.round(theoAMR)} kcal).`);
+            if (targetCalories < theoBMR && goals.weeklyGoal < 0) {
+                recommendations.push("❗ Váš cílový denní příjem je pod vaším teoretickým BMR. Dlouhodobě to nemusí být udržitelné. Zvažte mírnější cíl nebo konzultaci s odborníkem.");
+            }
+        } else if (theoAMR > 0 && latestEntry.manualAMR) {
+            recommendations.push(`💡 Váš poslední zadaný AMR je ${latestEntry.manualAMR} kcal. Teoreticky vypočtený AMR je ${Math.round(theoAMR)} kcal. Rozdíl může být dán specifickou aktivitou nebo metodikou měření.`);
+        }
+        document.getElementById('recommendationText').innerHTML = recommendations.length > 0 ? recommendations.map(rec => `<p>${rec}</p>`).join('') : '<p>Žádná specifická doporučení. Udržujte zdravé návyky!</p>';
+        console.log("updateRecommendations: Doporučení aktualizována.");
+    };
+
+    window.updateDisplay = function() {
+        console.log("updateDisplay: Spuštěna celková aktualizace zobrazení.");
+        window.updateTable();
+        window.updateCharts();
+        window.updateStats();
+        window.updateRecommendations();
+        console.log("updateDisplay: Celkové zobrazení aktualizováno.");
+    };
+
+    // Události formulářů a tlačítek - voláme globální funkce
+    document.getElementById('entryForm').addEventListener('submit', async function(e) {
+        console.log("entryForm: Odesílání nového záznamu.");
+        e.preventDefault();
+        const date = document.getElementById('entryDate').value;
+        const weight = parseFloat(document.getElementById('entryWeight').value);
+        const bodyFat = document.getElementById('entryBodyFat').value ? parseFloat(document.getElementById('entryBodyFat').value) : null;
+        const muscleMass = document.getElementById('entryMuscleMass').value ? parseFloat(document.getElementById('entryMuscleMass').value) : null;
+        const bodyWater = document.getElementById('entryBodyWater').value ? parseFloat(document.getElementById('entryBodyWater').value) : null;
+        const manualBMR = document.getElementById('entryManualBMR').value ? parseInt(document.getElementById('entryManualBMR').value) : null;
+        const manualAMR = document.getElementById('entryManualAMR').value ? parseInt(document.getElementById('entryManualAMR').value) : null;
+        const notes = document.getElementById('entryNotes').value;
+
+        if (isNaN(weight) || weight <= 0) {
+            window.showNotification('Chyba: Zadejte platnou váhu.', 3000);
+            console.warn("entryForm: Neplatná váha zadána.");
+            return;
+        }
+
+        const newEntryData = { date, weight, bodyFat, muscleMass, bodyWater, manualBMR, manualAMR, notes };
+        console.log("entryForm: Nová data záznamu:", newEntryData);
+
+        const existingIndex = weightLog.findIndex(entry => entry.date === date);
+        if (existingIndex !== -1) {
+            console.log("entryForm: Záznam pro toto datum již existuje. Dotazuji na přepsání.");
+            if (confirm('Záznam pro tento datum již existuje. Chcete ho přepsat?')) {
+                weightLog[existingIndex] = newEntryData;
+                console.log("entryForm: Existující záznam přepsán.");
+            } else {
+                console.log("entryForm: Přepsání záznamu zrušeno.");
+                return;
+            }
+        } else {
+            weightLog.push(newEntryData);
+            console.log("entryForm: Nový záznam přidán.");
+        }
+        await window.saveData(); // Voláme globální saveData()
+        window.updateDisplay(); // Voláme globální updateDisplay()
+        window.showNotification('Záznam byl úspěšně přidán/aktualizován!'); // Voláme globální showNotification()
+        this.reset();
+        window.setTodayDate(); // Voláme globální setTodayDate()
+        window.showTab('dashboard'); // Voláme globální showTab()
+        console.log("entryForm: Zpracování záznamu dokončeno.");
+    });
+
+    document.getElementById('settingsForm').addEventListener('submit', async function(e) {
+        console.log("settingsForm: Odesílání nastavení.");
+        e.preventDefault();
+        settings.height = parseInt(document.getElementById('height').value);
+        settings.age = document.getElementById('age').value ? parseInt(document.getElementById('age').value) : null;
+        settings.gender = document.getElementById('gender').value;
+        settings.activityLevel = parseFloat(document.getElementById('activityLevel').value);
+        console.log("settingsForm: Nové hodnoty nastavení:", settings);
+        await window.saveData(); // Voláme globální saveData()
+        window.updateDisplay(); // Voláme globální updateDisplay()
+        window.showNotification('Nastavení byla uložena!'); // Voláme globální showNotification()
+        console.log("settingsForm: Nastavení uložena.");
+    });
+
+    document.getElementById('bmiAlertsForm').addEventListener('submit', async function(e) {
+        console.log("bmiAlertsForm: Odesílání BMI hranic.");
+        e.preventDefault();
+        settings.bmiWarningUpper = parseFloat(document.getElementById('bmiWarningUpper').value);
+        settings.bmiDangerUpper = parseFloat(document.getElementById('bmiDangerUpper').value);
+        settings.bmiWarningLower = parseFloat(document.getElementById('bmiWarningLower').value);
+        console.log("bmiAlertsForm: Nové BMI hranice:", { warningUpper: settings.bmiWarningUpper, dangerUpper: settings.bmiDangerUpper, warningLower: settings.bmiWarningLower });
+        await window.saveData(); // Voláme globální saveData()
+        window.updateDisplay(); // Voláme globální updateDisplay()
+        window.showNotification('BMI hranice byly uloženy!'); // Voláme globální showNotification()
+        console.log("bmiAlertsForm: BMI hranice uloženy.");
+    });
+
+    document.getElementById('remindersForm').addEventListener('submit', async function(e) {
+        console.log("remindersForm: Odesílání nastavení připomínek.");
+        e.preventDefault();
+        settings.reminderEnabled = document.getElementById('reminderEnabled').checked;
+        settings.reminderInterval = parseInt(document.getElementById('reminderInterval').value);
+        console.log("remindersForm: Nové nastavení připomínek:", { enabled: settings.reminderEnabled, interval: settings.reminderInterval });
+        await window.saveData(); // Voláme globální saveData()
+        window.showNotification('Nastavení připomínek bylo uloženo!'); // Voláme globální showNotification()
+        console.log("remindersForm: Nastavení připomínek uloženo.");
+    });
+
+    document.getElementById('goalsForm').addEventListener('submit', async function(e) {
+        console.log("goalsForm: Odesílání cílů.");
+        e.preventDefault();
+        goals.targetWeight = document.getElementById('targetWeight').value ? parseFloat(document.getElementById('targetWeight').value) : null;
+        goals.targetBMI = document.getElementById('targetBMI').value ? parseFloat(document.getElementById('targetBMI').value) : null;
+        goals.targetDate = document.getElementById('targetDate').value || null;
+        goals.weeklyGoal = document.getElementById('weeklyGoal').value ? parseFloat(document.getElementById('weeklyGoal').value) : null;
+        console.log("goalsForm: Nové cíle:", goals);
+        await window.saveData(); // Voláme globální saveData()
+        window.updateDisplay(); // Voláme globální updateDisplay()
+        window.showNotification('Cíle byly uloženy!'); // Voláme globální showNotification()
+        console.log("goalsForm: Cíle uloženy.");
+    });
+
+    // Globalizované funkce pro onclick atributy
+    window.deleteEntry = async function(date) {
+        console.log(`deleteEntry: Pokus o smazání záznamu pro datum: ${date}.`);
+        if (confirm(`Opravdu chcete smazat záznam ze dne ${window.formatDateForDisplay(date)}?`)) {
+            weightLog = weightLog.filter(entry => entry.date !== date);
+            console.log(`deleteEntry: Záznam pro datum ${date} smazán z lokální paměti.`);
+            await window.saveData(); // Voláme globální saveData() (které nyní maže i z Firestore)
+            // Smazání z Firebase je nyní součástí saveData, které volá deleteWeightEntryFromFirestore
+            window.updateDisplay(); // Voláme globální updateDisplay()
+            window.showNotification('Záznam byl smazán!'); // Voláme globální showNotification()
+            console.log("deleteEntry: Záznam smazání dokončeno.");
+        } else {
+            console.log("deleteEntry: Smazání záznamu zrušeno.");
+        }
+    };
+
+    window.editEntry = function(date) {
+        console.log(`editEntry: Pokus o editaci záznamu pro datum: ${date}.`);
+        const entry = weightLog.find(e => e.date === date);
+        if (entry) {
+            document.getElementById('entryDate').value = entry.date;
+            document.getElementById('entryWeight').value = entry.weight;
+            document.getElementById('entryBodyFat').value = entry.bodyFat || '';
+            document.getElementById('entryMuscleMass').value = entry.muscleMass || '';
+            document.getElementById('entryBodyWater').value = entry.bodyWater || '';
+            document.getElementById('entryManualBMR').value = entry.manualBMR || '';
+            document.getElementById('entryManualAMR').value = entry.manualAMR || '';
+            document.getElementById('entryNotes').value = entry.notes || '';
+            window.showTab('add-entry');
+            window.showNotification(`Záznam ze dne ${window.formatDateForDisplay(date)} načten pro editaci.`);
+            console.log("editEntry: Záznam načten do formuláře pro editaci.");
+        } else {
+            console.warn(`editEntry: Záznam pro datum ${date} nebyl nalezen pro editaci.`);
+        }
+    };
+
+    window.exportToCSV = function() {
+        console.log("exportToCSV: Spuštěn export dat do CSV.");
+        if (weightLog.length === 0) { window.showNotification("Není co exportovat.", 2000); console.warn("exportToCSV: Žádná data k exportu."); return; }
+        const headers = ['Datum', 'Vaha (kg)', 'BMI', 'Telesny tuk (%)', 'Svalova hmota (%)', 'Svalova hmota (%)', 'Voda v tele (%)', 'Manual BMR', 'Manual AMR', 'Poznamky'];
+        const rows = weightLog.map(entry => {
+            let musclePercent = '';
+            if (entry.muscleMass && entry.weight && entry.weight > 0) {
+                musclePercent = ((entry.muscleMass / entry.weight) * 100).toFixed(1);
+            }
+            return [
+                entry.date, entry.weight, window.calculateBMI(entry.weight, settings.height).toFixed(1),
+                entry.bodyFat || '', musclePercent, entry.muscleMass || '', entry.bodyWater || '',
+                entry.manualBMR || '', entry.manualAMR || '', `"${(entry.notes || '').replace(/"/g, '""')}"`
+            ];
+        });
+
+        const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + '\n' + rows.map(row => row.join(',')).join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `vaha_export_Jirik_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        window.showNotification('CSV export dokončen!');
+        console.log("exportToCSV: Export CSV dokončen.");
+    };
+
+    window.exportToPDF = function() {
+        console.log("exportToPDF: Spuštěn export dat do PDF.");
+        if (weightLog.length === 0) { window.showNotification("Není co exportovat.", 2000); console.warn("exportToPDF: Žádná data k exportu."); return; }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        doc.setFontSize(18); doc.text('Váhový report - Admirál Jiřík', 14, 22);
+        doc.setFontSize(11); doc.text(`Generováno: ${window.formatDateForDisplay(new Date().toISOString().split('T')[0])}`, 14, 30);
+        doc.text(`Výška: ${settings.height} cm, Věk: ${settings.age || '-'} let, Pohlaví: ${settings.gender === 'male' ? 'Muž' : 'Žena'}`, 14, 36);
+        
+        const latestEntry = [...weightLog].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+        if (latestEntry) {
+            const currentBMI = window.calculateBMI(latestEntry.weight, settings.height);
+            const theoBMR = window.calculateBMR(latestEntry.weight, settings.height, settings.age, settings.gender);
+            const theoAMR = window.calculateAMR(theoBMR, settings.activityLevel);
+            doc.text(`Aktuální váha: ${latestEntry.weight.toFixed(1)} kg, BMI: ${currentBMI > 0 ? currentBMI.toFixed(1) : '-'}`, 14, 42);
+            if (latestEntry.manualBMR || latestEntry.manualAMR) {
+                doc.text(`Posl. zadaný BMR: ${latestEntry.manualBMR || '-'} kcal, AMR: ${latestEntry.manualAMR || '-'} kcal`, 14, 48);
+            } else {
+                doc.text(`Teoretický BMR: ${theoBMR > 0 ? Math.round(theoBMR) : '-'} kcal, AMR: ${theoAMR > 0 ? Math.round(theoAMR) : '-'} kcal`, 14, 48);
+            }
+        }
+
+        const tableColumn = ["#", "Datum", "Váha", "BMI", "Tuk%", "Svaly%", "Voda%", "Zad.BMR", "Zad.AMR"];
+        const tableRows = [];
+        const sortedLog = [...weightLog].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        sortedLog.forEach((entry, index) => {
+            const bmi = window.calculateBMI(entry.weight, settings.height);
+            let musclePercentText = '-';
+            if (entry.muscleMass && entry.weight && entry.weight > 0) {
+                musclePercentText = ((entry.muscleMass / entry.weight) * 100).toFixed(1);
+            }
+            const rowData = [
+                index + 1, window.formatDateForDisplay(entry.date), entry.weight.toFixed(1),
+                bmi > 0 ? bmi.toFixed(1) : '-',
+                entry.bodyFat !== null && entry.bodyFat !== undefined ? entry.bodyFat.toFixed(1) : '-',
+                musclePercentText,
+                entry.bodyWater !== null && entry.bodyWater !== undefined ? entry.bodyWater.toFixed(1) : '-',
+                entry.manualBMR !== null && entry.manualBMR !== undefined ? entry.manualBMR : '-',
+                entry.manualAMR !== null && entry.manualAMR !== undefined ? entry.manualAMR : '-',
+            ];
+            tableRows.push(rowData);
+        });
+
+        doc.autoTable({ head: [tableColumn], body: tableRows, startY: 55, theme: 'grid', headStyles: { fillColor: [13, 17, 23], textColor: [0, 217, 255] }, styles: { font: "Consolas", cellPadding: 1.5, fontSize: 7 }, columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 20 }, } });
+        doc.save(`vaha_report_Jirik_${new Date().toISOString().split('T')[0]}.pdf`);
+        window.showNotification('PDF report dokončen!');
+        console.log("exportToPDF: Export PDF dokončen.");
+    };
+
+    window.exportChartsAsPDF = function() {
+        console.log("exportChartsAsPDF: Spuštěn export grafů do PDF.");
+        if (weightLog.length === 0) { window.showNotification("Není co exportovat.", 2000); console.warn("exportChartsAsPDF: Žádná data pro export."); return; }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        let yPos = 20; const chartWidth = 180; const chartHeight = 70; const spacing = 10;
+        doc.setFontSize(18); doc.text('Grafy vývoje - Admirál Jiřík', doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
+        const chartsToExport = [
+            { canvasId: 'weightChart', title: 'Vývoj váhy' }, { canvasId: 'bmiChart', title: 'Vývoj BMI' },
+            { canvasId: 'bodyFatOnlyChart', title: 'Vývoj tělesného tuku (%)' }, { canvasId: 'muscleMassOnlyChart', title: 'Vývoj svalové hmoty (%)' },
+            { canvasId: 'bodyWaterChart', title: 'Vývoj vody v těle (%)' }, { canvasId: 'manualBMRChart', title: 'Vývoj zadaného BMR (kcal)' },
+            { canvasId: 'manualAMRChart', title: 'Vývoj zadaného AMR (kcal)' }
+        ];
+        chartsToExport.forEach((chartInfo, index) => {
+            const canvas = document.getElementById(chartInfo.canvasId);
+            const chartInstance = Chart.getChart(canvas);
+            let hasData = false;
+            if (chartInstance && chartInstance.data.labels.length > 0) {
+                hasData = chartInstance.data.datasets.some(dataset => dataset.data.some(d => d !== null && !isNaN(d) && d !== undefined));
+            }
+            if (!hasData) return;
+            if (yPos + chartHeight + spacing > doc.internal.pageSize.getHeight() - 15 && index > 0) { doc.addPage(); yPos = 20; }
+            doc.setFontSize(12); doc.text(chartInfo.title, 15, yPos); yPos += 5;
+            const imgData = canvas.toDataURL('image/png', 0.95);
+            doc.addImage(imgData, 'PNG', 15, yPos, chartWidth, chartHeight); yPos += chartHeight + spacing;
+        });
+        doc.save(`vaha_grafy_Jirik_${new Date().toISOString().split('T')[0]}.pdf`);
+        window.showNotification('Grafy exportovány do PDF!');
+        console.log("exportChartsAsPDF: Export grafů dokončen.");
+    };
+
+    window.exportBackup = function() {
+        console.log("exportBackup: Spuštěno vytváření úplné zálohy.");
+        const backupData = {
+            weightLog: weightLog, settings: settings, goals: goals,
+            exportDate: new Date().toISOString(), appName: "Pokročilý váhový tracker více admirála Jiříka", version: "1.5.0"
+        };
+        const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `vaha_zaloha_Jirik_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        window.showNotification('Úplná záloha vytvořena!');
+        console.log("exportBackup: Úplná záloha vytvořena.");
+    };
+
+    window.importFromCSV = async function(inputElement) {
+        console.log("importFromCSV: Spuštěn import dat z CSV.");
+        const file = inputElement.files[0]; if (!file) { console.warn("importFromCSV: Žádný soubor vybrán."); return; }
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            console.log("importFromCSV: Soubor CSV načten.");
+            const csv = e.target.result; const lines = csv.split(/\r\n|\n/);
+            if (lines.length <= 1) { window.showNotification('CSV soubor je prázdný nebo neobsahuje data.', 3000); console.warn("importFromCSV: CSV soubor je prázdný."); inputElement.value = ''; return; }
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const muscleKgOrPercentIdx = headers.indexOf('svalova hmota (kg)') !== -1 ? headers.indexOf('svalova hmota (kg)') : headers.indexOf('svalova hmota (%)');
+            
+            const dateIdx = headers.indexOf('datum'); const weightIdx = headers.indexOf('vaha (kg)');
+            const fatIdx = headers.indexOf('telesny tuk (%)'); const waterIdx = headers.indexOf('voda v tele (%)');
+            const manualBmrIdx = headers.indexOf('manual bmr'); const manualAmrIdx = headers.indexOf('manual amr');
+            const notesIdx = headers.indexOf('poznamky');
+
+            let importedCount = 0; let skippedCount = 0;
+            console.log(`importFromCSV: Zpracovávám ${lines.length - 1} řádků CSV.`);
+            for (let i = 1; i < lines.length; i++) {
+                const data = lines[i].split(',');
+                const date = data[dateIdx] ? data[dateIdx].trim() : null;
+                const weight = data[weightIdx] ? parseFloat(data[weightIdx].trim()) : null;
+                if (!date || !weight || isNaN(weight)) { skippedCount++; console.warn(`importFromCSV: Přeskočen neplatný řádek ${i}: ${lines[i]}`); continue; }
+                
+                let muscleMassKg = null;
+                if (muscleKgOrPercentIdx !== -1 && data[muscleKgOrPercentIdx] && !isNaN(parseFloat(data[muscleKgOrPercentIdx].trim()))) {
+                    if (headers[muscleKgOrPercentIdx] === 'svalova hmota (%)') {
+                        const percent = parseFloat(data[muscleKgOrPercentIdx].trim());
+                        muscleMassKg = parseFloat(((percent / 100) * weight).toFixed(2));
+                    } else { muscleMassKg = parseFloat(data[muscleKgOrPercentIdx].trim()); }
+                }
+                const newEntry = {
+                    date: date, weight: weight, bodyFat: fatIdx !== -1 && data[fatIdx] ? parseFloat(data[fatIdx].trim()) : null,
+                    muscleMass: muscleMassKg, bodyWater: waterIdx !== -1 && data[waterIdx] ? parseFloat(data[waterIdx].trim()) : null,
+                    manualBMR: manualBmrIdx !== -1 && data[manualBmrIdx] ? parseInt(data[manualBmrIdx].trim()) : null,
+                    manualAMR: manualAmrIdx !== -1 && data[manualAmrIdx] ? parseInt(data[manualAmrIdx].trim()) : null,
+                    notes: notesIdx !== -1 && data[notesIdx] ? data[notesIdx].trim().replace(/^"|"$/g, '') : ""
+                };
+                const existingIndex = weightLog.findIndex(entry => entry.date === newEntry.date);
+                if (existingIndex !== -1) { weightLog[existingIndex] = newEntry; console.log(`importFromCSV: Aktualizován záznam pro datum ${date}.`); } else { weightLog.push(newEntry); console.log(`importFromCSV: Přidán nový záznam pro datum ${date}.`); }
+                importedCount++;
+            }
+            if (importedCount > 0) {
+                console.log("importFromCSV: Ukládám importovaná data.");
+                await window.saveData(); // Voláme globální saveData()
+                window.updateDisplay(); // Voláme globální updateDisplay()
+                window.showNotification(`Importováno ${importedCount} záznamů. ${skippedCount > 0 ? skippedCount + ' přeskočeno.' : ''}`);
+            } else { window.showNotification('Nebyly nalezeny žádné platné záznamy k importu v CSV.', 3000); }
+            inputElement.value = '';
+            console.log("importFromCSV: Import CSV dokončen.");
+        };
+        reader.readAsText(file);
+    };
+
+    window.importFromBackup = async function(inputElement) { // Globalizováno a async
+        console.log("importFromBackup: Spuštěn import ze zálohy.");
+        const file = inputElement.files[0]; if (!file) { console.warn("importFromBackup: Žádný soubor zálohy vybrán."); return; }
+        const reader = new FileReader();
+        reader.onload = async function(e) { // async vnořená funkce
+            console.log("importFromBackup: Soubor zálohy načten.");
+            try {
+                const backupData = JSON.parse(e.target.result);
+                console.log("importFromBackup: Data zálohy analyzována:", backupData);
+                if (backupData.appName !== "Pokročilý váhový tracker více admirála Jiříka") {
+                    console.warn("importFromBackup: Soubor zálohy nepochází z této aplikace. Dotazuji uživatele na pokračování.");
+                    if (!confirm("Zdá se, že tento soubor nepochází z této aplikace. Přesto pokračovat?")) {
+                        inputElement.value = ''; console.log("importFromBackup: Import zálohy zrušen uživatelem."); return;
+                    }
+                }
+                if (backupData.weightLog) { weightLog = backupData.weightLog; console.log("importFromBackup: weightLog ze zálohy načten."); }
+                if (backupData.settings) { settings = { ...settings, ...backupData.settings }; console.log("importFromBackup: Nastavení ze zálohy načtena."); }
+                if (backupData.goals) { goals = { ...goals, ...backupData.goals }; console.log("importFromBackup: Cíle ze zálohy načteny."); }
+                
+                weightLog.forEach(entry => { // Zajištění kompatibility starších záznamů
+                    if (entry.manualBMR === undefined) entry.manualBMR = null;
+                    if (entry.manualAMR === undefined) entry.manualAMR = null;
+                    if (entry.muscleMass === undefined) entry.muscleMass = null;
+                });
+                console.log("importFromBackup: Data zálohy připravena, ukládám.");
+                await window.saveData(); // Voláme globální saveData()
+                window.updateForms(); // Voláme globální updateForms()
+                window.updateDisplay(); // Voláme globální updateDisplay()
+                window.showNotification('Záloha úspěšně obnovena!');
+                console.log("importFromBackup: Import zálohy dokončen.");
+            } catch (error) {
+                window.showNotification('Chyba při načítání zálohy: ' + error.message, 4000);
+                console.error("importFromBackup: Chyba při zpracování souboru zálohy:", error);
+            }
+            inputElement.value = '';
+        };
+        reader.readAsText(file);
+    };
+
+    window.clearAllData = async function() {
+        console.log("clearAllData: Spuštěn proces mazání všech dat.");
+        if (confirm('⚠️ OPRAVDU chcete smazat VŠECHNA data? Tuto akci nelze vrátit zpět!')) {
+            console.log("clearAllData: Uživatel potvrdil 1. fázi mazání.");
+            if (confirm('⚠️ JSTE SI ABSOLUTNĚ JISTI? Všechna data budou nenávratně ztracena!')) {
+                console.log("clearAllData: Uživatel potvrdil 2. fázi mazání. Mažu data.");
+                localStorage.removeItem('weightLog_JirikTracker_v2_charts_separated_musclePercent');
+                localStorage.removeItem('weightSettings_JirikTracker_v2_charts_separated_musclePercent');
+                localStorage.removeItem('weightGoals_JirikTracker_v2_charts_separated_musclePercent');
+                console.log("clearAllData: Lokální data smazána z LocalStorage.");
+                
+                try {
+                    console.log("clearAllData: Pokouším se smazat všechna data z Firebase Firestore.");
+                    await window.clearAllFirestoreData(); // Tato funkce je definována v firebaseFunctions.js
+                    console.log("clearAllData: Všechna data úspěšně smazána z Firebase Firestore.");
+                } catch (error) {
+                    console.error("clearAllData: Chyba při mazání všech dat z Firebase Firestore:", error);
+                    window.showNotification("Chyba při mazání dat z cloudu! Smažte je prosím ručně v konzoli Firebase.", 8000);
+                }
+
+                weightLog = [];
+                // Reset settings a goals na výchozí hodnoty
+                settings = { height: 174, age: null, gender: 'male', activityLevel: 1.55, bmiWarningUpper: 25, bmiDangerUpper: 30, bmiWarningLower: 18.5, reminderEnabled: true, reminderInterval: 7 };
+                goals = { targetWeight: null, targetBMI: null, targetDate: null, weeklyGoal: null };
+                console.log("clearAllData: Globální proměnné resetovány na výchozí hodnoty.");
+                await window.loadData(); // Voláme globální loadData() pro opětovné načtení (nyní prázdné nebo výchozí)
+                window.showNotification('Všechna data byla smazána!');
+                console.log("clearAllData: Proces mazání všech dat dokončen.");
+            } else {
+                console.log("clearAllData: Mazání všech dat zrušeno uživatelem (2. fáze).");
+            }
+        } else {
+            console.log("clearAllData: Mazání všech dat zrušeno uživatelem (1. fáze).");
+        }
+    };
+
+    window.checkReminders = function() {
+        console.log("checkReminders: Kontroluji, zda je třeba zobrazit připomínku.");
+        if (!settings.reminderEnabled) {
+            console.log("checkReminders: Připomínky jsou zakázány.");
+            return;
+        }
+        if (weightLog.length === 0) {
+            console.log("checkReminders: Žádné záznamy váhy, připomínka není nutná.");
+            return;
+        }
+        const lastEntry = [...weightLog].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+        if (lastEntry) {
+            const daysSinceLastEntry = Math.floor((new Date() - new Date(lastEntry.date)) / (1000 * 60 * 60 * 24));
+            console.log(`checkReminders: Dní od posledního záznamu (${window.formatDateForDisplay(lastEntry.date)}): ${daysSinceLastEntry}. Interval: ${settings.reminderInterval}.`);
+            if (daysSinceLastEntry >= settings.reminderInterval) {
+                window.showNotification(`⏰ Připomínka: Poslední záznam váhy byl před ${daysSinceLastEntry} dny (${window.formatDateForDisplay(lastEntry.date)})!`, 5000);
+                console.log("checkReminders: Zobrazena připomínka.");
+            } else {
+                console.log("checkReminders: Připomínka není nutná, interval ještě nevypršel.");
+            }
+        }
+    };
+    setInterval(window.checkReminders, 30 * 60 * 1000); // Používáme globální checkReminders
+
+
+    window.toggleFullScreen = function() {
+        console.log("toggleFullScreen: Pokus o přepnutí režimu celé obrazovky.");
+        const elem = document.documentElement;
+        const btn = document.getElementById('fullscreen-btn');
+        if (!document.fullscreenElement) {
+            console.log("toggleFullScreen: Vstupuji do celoobrazovkového režimu.");
+            if (elem.requestFullscreen) elem.requestFullscreen().catch(err => console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`));
+            else if (elem.mozRequestFullScreen) elem.mozRequestFullScreen();
+            else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+            else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+            if(btn) btn.innerHTML = '&#10006;';
+        } else {
+            console.log("toggleFullScreen: Opouštím celoobrazovkový režim.");
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            else if (document.msExitFullscreen) elem.msExitFullscreen();
+            if(btn) btn.innerHTML = '&#x26F6;';
+        }
+        console.log("toggleFullScreen: Přepnutí režimu celé obrazovky dokončeno.");
+    };
+    
+    window.updateFullscreenButtonIcon = function() {
+        // console.log("updateFullscreenButtonIcon: Aktualizuji ikonu fullscreen tlačítka."); // Velmi časté volání
+        const btn = document.getElementById('fullscreen-btn');
+        if(!btn) return;
+        if (document.fullscreenElement || document.mozFullScreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
+            btn.innerHTML = '&#10006;';
+        } else {
+            btn.innerHTML = '&#x26F6;';
+        }
+    };
+
+    // Funkce pro aktualizaci všech údajů z tlačítka
+    window.refreshAllData = async function() {
+        console.log("refreshAllData: Spuštěna ruční aktualizace všech údajů (z tlačítka).");
+        // Nejdříve zničíme existující instance grafů, než je znovu inicializujeme
+        if (weightChart) { weightChart.destroy(); console.log("refreshAllData: weightChart zničen."); }
+        if (bmiChart) { bmiChart.destroy(); console.log("refreshAllData: bmiChart zničen."); }
+        if (bodyFatOnlyChart) { bodyFatOnlyChart.destroy(); console.log("refreshAllData: bodyFatOnlyChart zničen."); }
+        if (muscleMassOnlyChart) { muscleMassOnlyChart.destroy(); console.log("refreshAllData: muscleMassOnlyChart zničen."); }
+        if (bodyWaterChart) { bodyWaterChart.destroy(); console.log("refreshAllData: bodyWaterChart zničen."); }
+        if (manualBMRChart) { manualBMRChart.destroy(); console.log("refreshAllData: manualBMRChart zničen."); }
+        if (manualAMRChart) { manualAMRChart.destroy(); console.log("refreshAllData: manualAMRChart zničen."); }
+
+        await window.loadData(); // Voláme globální loadData()
+        window.updateForms(); // Voláme globální updateForms()
+        window.initializeCharts(); // Voláme globální initializeCharts()
+        window.updateDisplay(); // Voláme globální updateDisplay()
+        window.checkReminders(); // Voláme globální checkReminders()
+        window.showNotification('Všechny údaje byly úspěšně aktualizovány (včetně cloudu)!', 3000);
+        console.log("refreshAllData: Ruční aktualizace dokončena.");
+    };
+
+    // Hlavní inicializační logika po načtení DOM
+    document.addEventListener('DOMContentLoaded', async function() {
+        console.log("DOMContentLoaded: DOM plně načten. Spouštím hlavní inicializaci aplikace.");
+        // Inicializujeme Firebase aplikaci a Firestore databázi pomocí funkce z firebaseFunctions.js
+        // Tato funkce (window.initializeFirebaseApp) je definována v firebaseFunctions.js
+        if (window.initializeFirebaseApp()) {
+            console.log("DOMContentLoaded: Firebase inicializace dokončena v hlavní stránce. Pokouším se načíst data.");
+            // Nyní, když je Firebase připraveno, můžeme načíst data
+            await window.loadData();
+        } else {
+            console.error("DOMContentLoaded: Kritická chyba: Nepodařilo se inicializovat Firebase. Aplikace bude fungovat pouze s LocalStorage daty.");
+            window.showNotification("Kritická chyba: Nelze se připojit k databázi. Data se ukládají pouze lokálně!", 8000);
+            // I přes selhání Firebase se pokusíme načíst z LocalStorage a zobrazit UI
+            await window.loadData(); // Spustí načítání (fallback na LocalStorage)
+        }
+        
+        console.log("DOMContentLoaded: Inicializuji grafy a aktualizuji zobrazení.");
+        window.initializeCharts();
+        window.updateDisplay();
+        window.checkReminders();
+        window.setTodayDate();
+
+        // Přidání tlačítka na celou obrazovku
+        const fullscreenButton = document.createElement('button');
+        fullscreenButton.className = 'fullscreen';
+        fullscreenButton.id = 'fullscreen-btn';
+        fullscreenButton.innerHTML = '&#x26F6;';
+        fullscreenButton.title = 'Přepnout na celou obrazovku';
+        fullscreenButton.addEventListener('click', window.toggleFullScreen);
+        document.body.appendChild(fullscreenButton);
+        console.log("DOMContentLoaded: Fullscreen tlačítko přidáno.");
+
+        ['fullscreenchange', 'mozfullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange'].forEach(event => {
+            document.addEventListener(event, window.updateFullscreenButtonIcon);
+            console.log(`DOMContentLoaded: Posluchač události ${event} přidán.`);
+        });
+        console.log("DOMContentLoaded: Hlavní inicializace aplikace dokončena.");
+    });
+
+</script>
+</body>
+</html>
